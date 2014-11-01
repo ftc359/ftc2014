@@ -43,10 +43,10 @@ task main()
 					motor[rightDrive] = speed[currentMotor-1];
 					break;
 				}
+				while(nNxtButtonPressed != -1){/*Do nothing*/}
+				motor[leftDrive] = 0;
+				motor[rightDrive] = 0;
 			}
-		}else{
-			motor[leftDrive] = 0;
-			motor[rightDrive] = 0;
 		}
 		if(nNxtButtonPressed == 1){
 			speed[currentMotor-1] += 5;
