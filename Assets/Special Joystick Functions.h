@@ -13,6 +13,6 @@ int joystickLinear(int deadzone, int maxSpeed, int joystickCurrent){
 		return 0;
 	}
 	int polarity = joystickCurrent/abs(joystickCurrent);
-	long newInside = maxSpeed((abs(joystickCurrent)-127)*maxSpeed)/(deadzone-127);
+	long newInside = maxSpeed*((abs(joystickCurrent)-127)*maxSpeed)/(deadzone-127);
 	return polarity*newInside;
 }
