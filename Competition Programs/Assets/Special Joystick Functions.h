@@ -16,3 +16,7 @@ int joystickLinear(int deadzone, int maxSpeed, int joystickCurrent){
 	long newInside = maxSpeed-((abs(joystickCurrent)-127)*maxSpeed)/(deadzone-127);
 	return polarity*newInside;
 }
+
+int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
+	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
+}
