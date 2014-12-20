@@ -25,9 +25,14 @@ Press and hold the orange button to run selected motor(s).
 Use the arrows to change the speed of the selected motor(s).
 */
 
-int speed[] = {100, 100, 100};
-int currentMotor = 1; //3 = both
+int speed[3][4];
+int currentMotor[3] = {1,1,1}; //3 = both
 int motorController = 1;
+bool bValChanged;
+
+int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
+	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
+}
 
 void motor1(int speed){
 	switch(motorController){
@@ -66,83 +71,113 @@ void motor2(int speed){
 task controllerFlash{
 	while(true){
 		clearTimer(T1);
-		while(time1(T1) <= 500){
+		while(time1(T1) <= 500)
 			nxtDisplayTextLine(1,"Controller: [%d]",motorController);
-		}
+		while(bValChanged)
+			nxtDisplayTextLine(1,"Controller: [%d]",motorController);
+		clearTimer(T1);
 		nxtDisplayTextLine(1,"Controller:");
-		wait1Msec(500);
+		while(time1(T1) <= 500 && !bValChanged){}
 	}
 }
 
 task main()
 {
-	//Motor Controler Selection
-	startTask(controllerFlash);
 	while(true){
-		if(nNxtButtonPressed == 1){
-			while(nNxtButtonPressed != -1){}
-			if(++motorController > 4){
-				motorController = 4;
+		startTask(controllerFlash);
+		while(true){
+			if(nNxtButtonPressed == 1){
+				bValChanged = true;
+				while(nNxtButtonPressed == 1){}
+				if(++motorController > 4)
+					motorController = 4;
+				clearTimer(T2);
 			}
-		}
-		if(nNxtButtonPressed == 2){
-			while(nNxtButtonPressed != -1){}
-			if(--motorController < 1){
-				motorController = 1;
+			if(nNxtButtonPressed == 2){
+				bValChanged = true;
+				while(nNxtButtonPressed == 2){}
+				if(--motorController < 1)
+					motorController = 1;
+				clearTimer(T2);
 			}
+			if(nNxtButtonPressed == 3){
+				while(nNxtButtonPressed == 3){}
+				nNxtExitClicks += 1;
+				break;
+			}
+			if(bValChanged && time1(T2) > 250)
+				bValChanged = false;
 		}
-		if(nNxtButtonPressed == 3){
-			while(nNxtButtonPressed != -1){}
-			break;
-		}
-	}
-	stopTask(controllerFlash);
-	nxtDisplayClearTextLine(1);
-	nxtDisplayCenteredTextLine(1,"Controller: %d",motorController);
-	while(true){
-		if(nNxtButtonPressed == 3){
-			clearTimer(T1);
-			while(time1(T1) <= 500 && nNxtButtonPressed != -1){}
-			if(time1(T1) <= 500){
-				if(++currentMotor > 3){
-					currentMotor = 1;
+		stopTask(controllerFlash);
+		nxtDisplayClearTextLine(1);
+		nxtDisplayCenteredTextLine(1,"Controller: %d",motorController);
+		if(currentMotor[motorController-1] == 3)
+			nxtDisplayTextLine(3, "Both Motors: %d", speed[currentMotor[motorController-1]-1][motorController-1]);
+		else
+			nxtDisplayTextLine(3, "Motor %d: %d", currentMotor[motorController-1], speed[currentMotor[motorController-1]-1][motorController-1]);
+		while(true){
+			if(nNxtButtonPressed == 0){
+				while(nNxtButtonPressed == 0){}
+				nxtDisplayClearTextLine(3);
+				break;
+			}
+			if(nNxtButtonPressed == 3){
+				clearTimer(T1);
+				while(time1(T1) <= 500 && nNxtButtonPressed != -1){}
+				if(time1(T1) <= 500){
+					if(++currentMotor[motorController-1] > 3)
+						currentMotor[motorController-1] = 1;
+					if(currentMotor[motorController-1] == 3)
+						nxtDisplayTextLine(3, "Both Motors: %d", speed[currentMotor[motorController-1]-1][motorController-1]);
+					else
+						nxtDisplayTextLine(3, "Motor %d: %d", currentMotor[motorController-1], speed[currentMotor[motorController-1]-1][motorController-1]);
+				}else{
+					switch(currentMotor[motorController-1]){
+					case 1:
+						motor1(speed[currentMotor[motorController-1]-1][motorController-1]);
+						break;
+					case 2:
+						motor2(speed[currentMotor[motorController-1]-1][motorController-1]);
+						break;
+					case 3:
+						motor1(speed[currentMotor[motorController-1]-1][motorController-1]);
+						motor2(-speed[currentMotor[motorController-1]-1][motorController-1]);
+						break;
+					}
+					nxtDisplayTextLine(5,"Running...");
+					while(nNxtButtonPressed == 3){/*Do nothing*/}
+					nxtDisplayClearTextLine(5);
+					motor1(0);
+					motor2(0);
 				}
-			}else{
-				switch(currentMotor){
-				case 1:
-					motor1(speed[currentMotor-1]);
-					break;
-				case 2:
-					motor2(speed[currentMotor-1]);
-					break;
-				case 3:
-					motor1(speed[currentMotor-1]);
-					motor2(-speed[currentMotor-1]);
-					break;
+			}
+			if(nNxtButtonPressed == 1){
+				clearTimer(T3);
+				while(nNxtButtonPressed == 1){
+					speed[currentMotor[motorController-1]-1][motorController-1] += 5;
+					if(speed[currentMotor[motorController-1]-1][motorController-1] > 100)
+						speed[currentMotor[motorController-1]-1][motorController-1] = 100;
+					wait1Msec(accelerate(250,75,3000,time1(T3)));
+					if(currentMotor[motorController-1] == 3)
+						nxtDisplayTextLine(3, "Both Motors: %d", speed[currentMotor[motorController-1]-1][motorController-1]);
+					else
+						nxtDisplayTextLine(3, "Motor %d: %d", currentMotor[motorController-1], speed[currentMotor[motorController-1]-1][motorController-1]);
 				}
-				while(nNxtButtonPressed != -1){/*Do nothing*/}
-				motor1(0);
-				motor2(0);
 			}
-		}
-		if(nNxtButtonPressed == 1){
-			speed[currentMotor-1] += 5;
-			if(speed[currentMotor-1] > 100){
-				speed[currentMotor-1] = 100;
+			if(nNxtButtonPressed == 2){
+				clearTimer(T3);
+				while(nNxtButtonPressed == 2){
+					speed[currentMotor[motorController-1]-1][motorController-1] -= 5;
+					if(speed[currentMotor[motorController-1]-1][motorController-1] < -100)
+						speed[currentMotor[motorController-1]-1][motorController-1] = -100;
+					wait1Msec(accelerate(250,75,3000,time1(T3)));
+					if(currentMotor[motorController-1] == 3)
+						nxtDisplayTextLine(3, "Both Motors: %d", speed[currentMotor[motorController-1]-1][motorController-1]);
+					else
+						nxtDisplayTextLine(3, "Motor %d: %d", currentMotor[motorController-1], speed[currentMotor[motorController-1]-1][motorController-1]);
+				}
 			}
-			wait1Msec(200);
-		}
-		if(nNxtButtonPressed == 2){
-			speed[currentMotor-1] -= 5;
-			if(speed[currentMotor-1] < -100){
-				speed[currentMotor-1] = -100;
-			}
-			wait1Msec(200);
-		}
-		if(currentMotor == 3){
-			nxtDisplayTextLine(3, "Both Motors: %d", speed[currentMotor-1]);
-		}else{
-			nxtDisplayTextLine(3, "Motor %d: %d", currentMotor, speed[currentMotor-1]);
+
 		}
 	}
 }
