@@ -3,10 +3,10 @@
 #pragma config(Sensor, S2,     ir,             sensorHiTechnicIRSeeker1200)
 #pragma config(Sensor, S3,     sonar,          sensorSONAR)
 #pragma config(Sensor, S4,     tMux,           sensorHiTechnicTouchMux)
-#pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop)
+#pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop, reversed)
 #pragma config(Motor,  mtr_S1_C1_2,     rightWheel,    tmotorTetrix, openLoop)
-#pragma config(Motor,  mtr_S1_C3_1,     intake,        tmotorTetrix, openLoop)
-#pragma config(Motor,  mtr_S1_C3_2,     lift,          tmotorTetrix, openLoop)
+#pragma config(Motor,  mtr_S1_C3_1,     intake,        tmotorTetrix, openLoop, reversed)
+#pragma config(Motor,  mtr_S1_C3_2,     lift,          tmotorTetrix, openLoop, reversed)
 #pragma config(Servo,  srvo_S1_C2_1,    dragger,              tServoStandard)
 #pragma config(Servo,  srvo_S1_C2_2,    servo2,               tServoNone)
 #pragma config(Servo,  srvo_S1_C2_3,    servo3,               tServoNone)
@@ -17,6 +17,7 @@
 
 #include "JoystickDriver.c"
 #include "Assets\Headers\Teleop_Funcs.h"
+#include "Assets\Headers\h359_14-15.h"
 
 int threshold = 10;
 int maxDrive = 100;
@@ -53,17 +54,9 @@ task main()
 		}else{
 			motor[lift] = 0;
 		}
-		if(joy1Btn(5) && !ignoreJ1B5)
-			ignoreJ1B5 = true;
-		else if(!joy1Btn(5)&& ignoreJ1B5){
-			servo[dragger] = 110;
-			ignoreJ1B5 = false;
-		}
-		if(joy1Btn(6) && !ignoreJ1B6)
-			ignoreJ1B6 = true;
-		else if(!joy1Btn(6)&& ignoreJ1B6){
-			servo[dragger] = 10;
-			ignoreJ1B6 = false;
-		}
+	if(toggleJ1B(5))
+			servo[dragger] = DRAGGER_UP;
+	if(toggleJ1B(6))
+			servo[dragger] = DRAGGER_DOWN;
 	}
 }

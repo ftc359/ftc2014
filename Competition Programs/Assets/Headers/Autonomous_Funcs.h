@@ -1,6 +1,10 @@
 #ifndef __AUTONOMOUS_FUNCS_H__
 #define __AUTONOMOUS_FUNCS_H__
 
+#if !defined(DRIVER) && !defined(DRIVEL) && !defined(DRIVEFR) && !defined(DRIVEFL) && !defined(DRIVEBR) && !defined(DRIVEBL)
+#warn "Drive motors not defined!"
+#endif
+
 #pragma systemFile
 
 #ifndef ENC_THRESHOLD       //To prevent encoder errors.
@@ -13,7 +17,7 @@ enum tDirection{
     right = 2,
     bwd = 3
 };
-
+/*
 struct nxtDisplayLineData{
     char config;
     string desc;
@@ -40,12 +44,12 @@ struct nxtDisplayLineData{
 };
 
 struct nxtDisplayLineData nxtDisplayLines[8];
-
+*/
 //Function prototypes
 void move(int power, long time, tDirection dir);
 void moveEnc(int power, long distance, tDirection dir);
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
-
+/*
 void configLine(int line, string desc, bool &input, string units, string valTrue, string valFalse);
 void configLine(int line, string desc, long &input, string units, long lowerLimit, long increment, long upperLimit);
 void configLine(int line, string desc, int &input, string units, int lowerLimit, int increment, int upperLimit);
@@ -53,7 +57,7 @@ void configLine(int line, string desc, short &input, string units, short lowerLi
 void configLine(int line, string desc, char &input, string units, char lowerLimit, char increment, char upperLimit);
 void configLine(int line, string desc, float &input, string units, float lowerLimit, float increment, float upperLimit);
 void startDisplay();
-
+*/
 void move(int power, long time, tDirection dir){
 #if defined(__HOLO_H__) && defined(DRIVEFR) && defined(DRIVEFL) && defined(DRIVEBR) && defined(DRIVEBL)
     motor[DRIVEFL] = power*(dir & 1)?-1:1;
@@ -112,7 +116,7 @@ void moveEnc(int power, long distance, tDirection dir){
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
 	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
 }
-
+/*
 void configLine(int line, string desc, bool &input, string units, string valTrue, string valFalse){
     nxtDisplayLines[line].config = 1;
     nxtDisplayLines[line].desc = desc;
@@ -166,6 +170,7 @@ void startDisplay(){
     byte ignoreNXTBut;    //Single byte to use with bitmasking
     byte recent;
     bool bValChanged;
+    string sTemp;
     //Initialize display
     nNxtExitClicks += 1; //not = 2 in case it is user set to something higher already
 #ifdef getJoystickSettings  //Check if "JoystickDriver.c" is included
@@ -176,7 +181,8 @@ void startDisplay(){
     for(int line; line < 8; line++){
         switch(nxtDisplayLines[line].config){
             case 1:
-                displayString(line, "%s%s%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].bp?nxtDisplayLines[line].valTrue:nxtDisplayLines[line].valFalse, nxtDisplayLines[line].units);
+            		sTemp = *nxtDisplayLines[line].bp?nxtDisplayLines[line].valTrue:nxtDisplayLines[line].valFalse;
+                displayString(line, "%s%s%s", nxtDisplayLines[line].desc, sTemp, nxtDisplayLines[line].units);
                 break;
             case 2:
                 displayString(line, "%s%d%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].lp, nxtDisplayLines[line].units);
@@ -207,7 +213,8 @@ void startDisplay(){
         else if(nNxtButtonPressed != 3 && ignoreNXTBut&4){
             switch(nxtDisplayLines[nSelectedLine].config){
                 case 1:
-                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse, nxtDisplayLines[nSelectedLine].units);
+                		sTemp = *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse;
+                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, sTemp, nxtDisplayLines[nSelectedLine].units);
                     break;
                 case 2:
                     displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].lp, nxtDisplayLines[nSelectedLine].units);
@@ -270,7 +277,7 @@ void startDisplay(){
             }
         }else if(nNxtButtonPressed != 1){
             if(ignoreNXTBut&2){
-                *nxtDisplayLines[nSelectedLine].bp = !*nxtDisplayLines[nSelectedLine].bp;
+                (*nxtDisplayLines[nSelectedLine].bp) = !(*nxtDisplayLines[nSelectedLine].bp);
                 bValChanged = true;
                 ignoreNXTBut ^= 2;
             }
@@ -315,7 +322,7 @@ void startDisplay(){
             }
         }else if(nNxtButtonPressed != 2){
             if(ignoreNXTBut&3){
-                *nxtDisplayLines[nSelectedLine].bp = !*nxtDisplayLines[nSelectedLine].bp;
+                (*nxtDisplayLines[nSelectedLine].bp) = !(*nxtDisplayLines[nSelectedLine].bp);
                 bValChanged = true;
                 ignoreNXTBut ^= 3;
             }
@@ -327,7 +334,8 @@ void startDisplay(){
         if(time1[T1] > 1000 || bValChanged){
             switch(nxtDisplayLines[nSelectedLine].config){
                 case 1:
-                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse, nxtDisplayLines[nSelectedLine].units);
+                		sTemp = *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse;
+                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, sTemp, nxtDisplayLines[nSelectedLine].units);
                     break;
                 case 2:
                     displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].lp, nxtDisplayLines[nSelectedLine].units);
@@ -359,7 +367,8 @@ void startDisplay(){
     bDisplayDiagnostics = true; //Resume NXT status display
 #endif
 }
-
+*/
+/*
 #ifdef getJoystickSettings
 void waitForStart(bool saveCPU, bool allowDisplayChanges)
 {
@@ -369,8 +378,8 @@ void waitForStart(bool saveCPU, bool allowDisplayChanges)
         if (!joystick.StopPgm)
             break;
         if(allowDisplayChanges && nNxtButtonPressed == 3){
-            while(nNxtButtonPressed == 3){/*Do Nothing*/}
-            startDisplay();
+            while(nNxtButtonPressed == 3){/*Do Nothing*//*}
+            //startDisplay();
         }
     }
     if(saveCPU)
@@ -378,5 +387,5 @@ void waitForStart(bool saveCPU, bool allowDisplayChanges)
     return;
 }
 #endif
-
+*/
 #endif //__AUTONOMOUS_FUNCS_H__
