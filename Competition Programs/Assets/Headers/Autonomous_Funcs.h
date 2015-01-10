@@ -1,15 +1,24 @@
 #ifndef __AUTONOMOUS_FUNCS_H__
 #define __AUTONOMOUS_FUNCS_H__
 
-#if !defined(DRIVER) && !defined(DRIVEL) && !defined(DRIVEFR) && !defined(DRIVEFL) && !defined(DRIVEBR) && !defined(DRIVEBL)
-#warn "Drive motors not defined!"
-#endif
-
 #pragma systemFile
 
-#ifndef ENC_THRESHOLD       //To prevent encoder errors.
-#define ENC_THRESHOLD   2000
+#ifndef  ENC_ERRORMARGIN       //To prevent encoder errors.
+#define  ENC_ERRORMARGIN   2000
 #endif
+
+#ifndef MAX_LINES
+#define MAX_LINES       8
+#endif
+
+#define CONFIG_UNSET    0
+#define CONFIG_CONSTANT 1
+#define CONFIG_BYTE     2
+#define CONFIG_SHORT    3
+#define CONFIG_LONG     4
+#define CONFIG_BOOL     5
+#define CONFIG_STRING   6
+#define CONFIG_CHAR     7
 
 enum tDirection{
     fwd = 0,
@@ -17,47 +26,39 @@ enum tDirection{
     right = 2,
     bwd = 3
 };
-/*
+
 struct nxtDisplayLineData{
-    char config;
+    unsigned byte config;
     string desc;
     string units;
-    bool *bp;
+    void *ptr;
+    long lowerLimit;
+    long increment;
+    long upperLimit;
+    unsigned byte arraySize;
     string valTrue;
     string valFalse;
-    long *lp;
-    long lowerLimitL;
-    long incrementL;
-    long upperLimitL;
-    int *ip;
-    int lowerLimitI;
-    int incrementI;
-    int upperLimitI;
-    short *sp;
-    short lowerLimitS;
-    short incrementS;
-    short upperLimitS;
-    float *fp;
-    float lowerLimitF;
-    float incrementF;
-    float upperLimitF;
 };
 
-struct nxtDisplayLineData nxtDisplayLines[8];
-*/
+struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
+
+int iLine;
+
 //Function prototypes
 void move(int power, long time, tDirection dir);
 void moveEnc(int power, long distance, tDirection dir);
+void moveEncSingle(tMotor mtr, int power, long distance);
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
-/*
-void configLine(int line, string desc, bool &input, string units, string valTrue, string valFalse);
-void configLine(int line, string desc, long &input, string units, long lowerLimit, long increment, long upperLimit);
-void configLine(int line, string desc, int &input, string units, int lowerLimit, int increment, int upperLimit);
-void configLine(int line, string desc, short &input, string units, short lowerLimit, short increment, short upperLimit);
-void configLine(int line, string desc, char &input, string units, char lowerLimit, char increment, char upperLimit);
-void configLine(int line, string desc, float &input, string units, float lowerLimit, float increment, float upperLimit);
-void startDisplay();
-*/
+
+void configLine(char* str);
+void configLine(char* desc, sbyte *ptr, char* units, sbyte lowerLimit, sbyte increment, sbyte upperLimit);
+void configLine(char* desc, short *ptr, char* units, short lowerLimit, short increment, short upperLimit);
+void configLine(char* desc, long *ptr, char* units, long lowerLimit, long increment, long upperLimit);	//Why no int? Byte size of int = long
+void configLine(char* desc, bool *ptr, char* units, char* valTrue, char* valFalse);
+//void configLine(char* desc, string *ptr, char* units, ubyte arraySize);
+//void configLine(char* desc, char *ptr, char* units, ubyte arraySize);
+void startDisplay(bool onPress, bool savePrefs);
+
 void move(int power, long time, tDirection dir){
 #if defined(__HOLO_H__) && defined(DRIVEFR) && defined(DRIVEFL) && defined(DRIVEBR) && defined(DRIVEBL)
     motor[DRIVEFL] = power*(dir & 1)?-1:1;
@@ -84,16 +85,16 @@ void moveEnc(int power, long distance, tDirection dir){
     nMotorEncoder[DRIVEFR] = 0;
     nMotorEncoder[DRIVEBL] = 0;
     nMotorEncoder[DRIVEBR] = 0;
-    wait1Msec(250); //wait for the encoders to calibrate
+    wait1Msec(300); //wait for the encoders to calibrate
     motor[DRIVEFL] = power*(dir & 1)?-1:1;
     motor[DRIVEFR] = power*(dir & 2)?-1:1;
     motor[DRIVEBL] = power*(dir & 1)?-1:1;
     motor[DRIVEBR] = power*(dir & 2)?-1:1;
     while(nPrev[0] < distance && nPrev[1] < distance && nPrev[2] < distance && nPrev[3] < distance){
-        nPrev[0] = (abs(nMotorEncoder[DRIVEFL]) >= nPrev[0] + ENC_THRESHOLD)?nPrev[0]:abs(nMotorEncoder[DRIVEFL]);
-        nPrev[1] = (abs(nMotorEncoder[DRIVEFR]) >= nPrev[1] + ENC_THRESHOLD)?nPrev[1]:abs(nMotorEncoder[DRIVEFR]);
-        nPrev[2] = (abs(nMotorEncoder[DRIVEBL]) >= nPrev[2] + ENC_THRESHOLD)?nPrev[2]:abs(nMotorEncoder[DRIVEBL]);
-        nPrev[3] = (abs(nMotorEncoder[DRIVEBR]) >= nPrev[3] + ENC_THRESHOLD)?nPrev[3]:abs(nMotorEncoder[DRIVEBR]);
+        nPrev[0] = (abs(nMotorEncoder[DRIVEFL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEFL]);
+        nPrev[1] = (abs(nMotorEncoder[DRIVEFR]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVEFR]);
+        nPrev[2] = (abs(nMotorEncoder[DRIVEBL]) >= nPrev[2] +  ENC_ERRORMARGIN)?nPrev[2]:abs(nMotorEncoder[DRIVEBL]);
+        nPrev[3] = (abs(nMotorEncoder[DRIVEBR]) >= nPrev[3] +  ENC_ERRORMARGIN)?nPrev[3]:abs(nMotorEncoder[DRIVEBR]);
     }
     motor[DRIVEFL] = 0;
     motor[DRIVEFR] = 0;
@@ -102,290 +103,590 @@ void moveEnc(int power, long distance, tDirection dir){
 #elif defined(DRIVER) && defined(DRIVEL)
     nMotorEncoder[DRIVEL] = 0;
     nMotorEncoder[DRIVER] = 0;
-    wait1Msec(250); //wait for the encoders to calibrate
+    wait1Msec(300); //wait for the encoders to calibrate
     motor[DRIVEL] = power*(dir & 1)?-1:1;
     motor[DRIVER] = power*(dir & 2)?-1:1;
     while(nPrev[0] < distance && nPrev[1] < distance){
-        nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] + ENC_THRESHOLD)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
-        nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] + ENC_THRESHOLD)?nPrev[1]:abs(nMotorEncoder[DRIVER]);
+        nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
+        nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]);
     }
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
 #endif
 }
+void moveEncSingle(tMotor mtr, int power, long distance){
+	long nPrev;
+	nMotorEncoder[mtr] = 0;
+	wait1Msec(300);	//wait for the encoders to calibrate
+	motor[mtr] = power;
+	while(nPrev < distance)
+		nPrev = (abs(nMotorEncoder[mtr]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[mtr]);
+	motor[mtr] = 0;
+}
+
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
+	if(currentTime > maxTime)
+		return stopSpeed;
 	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
 }
-/*
-void configLine(int line, string desc, bool &input, string units, string valTrue, string valFalse){
-    nxtDisplayLines[line].config = 1;
-    nxtDisplayLines[line].desc = desc;
-    nxtDisplayLines[line].bp = &input;
-    nxtDisplayLines[line].units = units;
-    nxtDisplayLines[line].valTrue = valTrue;
-    nxtDisplayLines[line].valFalse = valFalse;
+
+void configLine(char* str){
+    nxtDisplayLines[iLine].config = CONFIG_CONSTANT;
+    nxtDisplayLines[iLine++].desc = str;
 }
-void configLine(int line, string desc, long &input, string units, long lowerLimit, long increment, long upperLimit){
-    nxtDisplayLines[line].config = 2;
-    nxtDisplayLines[line].desc = desc;
-    nxtDisplayLines[line].lp = &input;
-    nxtDisplayLines[line].units = units;
-    nxtDisplayLines[line].lowerLimitL = lowerLimit;
-    nxtDisplayLines[line].incrementL = increment;
-    nxtDisplayLines[line].upperLimitL = upperLimit;
+void configLine(char* desc, sbyte *ptr, char* units, sbyte lowerLimit, sbyte increment, sbyte upperLimit){
+    nxtDisplayLines[iLine].config = CONFIG_BYTE;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine].ptr = (void*)(sbyte*)ptr;
+    nxtDisplayLines[iLine].lowerLimit = lowerLimit;
+    nxtDisplayLines[iLine].increment = increment;
+    nxtDisplayLines[iLine++].upperLimit = upperLimit;
 }
-void configLine(int line, string desc, int &input, string units, int lowerLimit, int increment, int upperLimit){
-    nxtDisplayLines[line].config = 3;
-    nxtDisplayLines[line].desc = desc;
-    nxtDisplayLines[line].ip = &input;
-    nxtDisplayLines[line].units = units;
-    nxtDisplayLines[line].lowerLimitI = lowerLimit;
-    nxtDisplayLines[line].incrementI = increment;
-    nxtDisplayLines[line].upperLimitI = upperLimit;
+void configLine(char* desc, short *ptr, char* units, short lowerLimit, short increment, short upperLimit){
+    nxtDisplayLines[iLine].config = CONFIG_SHORT;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine].ptr = (void*)(short*)ptr;
+    nxtDisplayLines[iLine].lowerLimit = lowerLimit;
+    nxtDisplayLines[iLine].increment = increment;
+    nxtDisplayLines[iLine++].upperLimit = upperLimit;
 }
-void configLine(int line, string desc, short &input, string units, short lowerLimit, short increment, short upperLimit){
-    nxtDisplayLines[line].config = 4;
-    nxtDisplayLines[line].desc = desc;
-    nxtDisplayLines[line].sp = &input;
-    nxtDisplayLines[line].units = units;
-    nxtDisplayLines[line].lowerLimitS = lowerLimit;
-    nxtDisplayLines[line].incrementS = increment;
-    nxtDisplayLines[line].upperLimitS = upperLimit;
+void configLine(char* desc, long *ptr, char* units, long lowerLimit, long increment, long upperLimit){
+    nxtDisplayLines[iLine].config = CONFIG_LONG;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine].ptr = (void*)(long*)ptr;
+    nxtDisplayLines[iLine].lowerLimit = lowerLimit;
+    nxtDisplayLines[iLine].increment = increment;
+    nxtDisplayLines[iLine++].upperLimit = upperLimit;
 }
-void configLine(int line, string desc, float &input, string units, float lowerLimit, float increment, float upperLimit){
-    nxtDisplayLines[line].config = 5;
-    nxtDisplayLines[line].desc = desc;
-    nxtDisplayLines[line].fp = &input;
-    nxtDisplayLines[line].units = units;
-    nxtDisplayLines[line].lowerLimitF = lowerLimit;
-    nxtDisplayLines[line].incrementF = increment;
-    nxtDisplayLines[line].upperLimitF = upperLimit;
+void configLine(char* desc, bool *ptr, char* units, char* valTrue, char* valFalse){
+    nxtDisplayLines[iLine].config = CONFIG_BOOL;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine].ptr = (void*)(bool*)ptr;
+    nxtDisplayLines[iLine].valTrue = valTrue;
+    nxtDisplayLines[iLine++].valFalse = valFalse;
+}/*
+void configLine(char* desc, string *ptr, char* units, ubyte arraySize){
+    nxtDisplayLines[iLine].config = CONFIG_STRING;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine].ptr = (void*)(string*)ptr;
+    nxtDisplayLines[iLine++].arraySize = arraySize;
 }
-void startDisplay(){
-    //Initialize local variables
-    int nSelectedLine = (nxtDisplayLines[0].config)?0:(nxtDisplayLines[1].config)?1:
-                        (nxtDisplayLines[2].config)?2:(nxtDisplayLines[3].config)?3:
-                        (nxtDisplayLines[4].config)?4:(nxtDisplayLines[5].config)?5:
-                        (nxtDisplayLines[6].config)?6:7;
-    byte ignoreNXTBut;    //Single byte to use with bitmasking
-    byte recent;
-    bool bValChanged;
+void configLine(char* desc, char *ptr, char* units, ubyte arraySize){
+    nxtDisplayLines[iLine++].config = CONFIG_CHAR;
+    nxtDisplayLines[iLine].desc = desc;
+    nxtDisplayLines[iLine].units = units;
+    nxtDisplayLines[iLine++].ptr = (void*)(char*)ptr;
+    nxtDisplayLines[iLine++].arraySize = arraySize;
+}*/
+void startDisplay(bool onPress, bool savePrefs){
+
+    int iNumLines = iLine;
+    int iCurrentLine = 0;
+    int iOffset = 0;
+    ubyte iArrayIndex[MAX_LINES];
     string sTemp;
-    //Initialize display
-    nNxtExitClicks += 1; //not = 2 in case it is user set to something higher already
-#ifdef getJoystickSettings  //Check if "JoystickDriver.c" is included
-    bDisplayDiagnostics = false; //Turn off NXT stat info in order to access the LCD screen
-    wait1Msec(200);
+
+    TFileHandle     hFileHandle;
+    TFileIOResult   nIoResult;
+    string kConfigFileName = "DisplayConfig.txt";
+    short nFileSize;
+    bool bDelete = false;
+
+    if(iNumLines == 0)
+        return;
+
+    nNxtExitClicks = 2;
+
+#ifdef getJoystickSettings  //Is JoystickDriver.c included?
+    stopTask(displayDiagnostics);
 #endif
+
     eraseDisplay();
-    for(int line; line < 8; line++){
-        switch(nxtDisplayLines[line].config){
-            case 1:
-            		sTemp = *nxtDisplayLines[line].bp?nxtDisplayLines[line].valTrue:nxtDisplayLines[line].valFalse;
-                displayString(line, "%s%s%s", nxtDisplayLines[line].desc, sTemp, nxtDisplayLines[line].units);
+    sleep(1);
+    eraseDisplay(); //In case screen glitches and does not erase everything the first time
+
+    if(savePrefs){
+        nxtDisplayCenteredTextLine(3, "Delete Last Save?");
+        nxtDisplayCenteredTextLine(4, "No");
+        while(true){
+        	if(nNxtButtonPressed == 3){
+        		if(!onPress)
+        			while(nNxtButtonPressed == 3){}
+        		break;
+        	}
+        	if(nNxtButtonPressed == 1){
+        		if(!onPress)
+        			while(nNxtButtonPressed == 1){}
+        		bDelete = !bDelete;
+        		displayClearTextLine(4);
+        		nxtDisplayCenteredTextLine(4, "%s", (bDelete)?"Yes":"No");
+        		if(onPress)
+        			while(nNxtButtonPressed == 1){}
+        	}
+        	if(nNxtButtonPressed == 1){
+        		if(!onPress)
+        			while(nNxtButtonPressed == 1){}
+        		bDelete = !bDelete;
+        		displayClearTextLine(4);
+        		nxtDisplayCenteredTextLine(4, "%s", (bDelete)?"Yes":"No");
+        		if(onPress)
+        			while(nNxtButtonPressed == 1){}
+        	}
+        }
+        displayClearTextLine(3);
+        displayClearTextLine(4);
+        if(bDelete)
+       	 Delete(kConfigFileName, nIoResult);
+        OpenRead(hFileHandle, nIoResult, kConfigFileName, nFileSize);
+        if(nIoResult == ioRsltSuccess){
+	        for(int index = 0; index <= iNumLines; index++){
+	        	switch(nxtDisplayLines[index].config) {
+	     	     case CONFIG_UNSET:
+	   		       break;
+		          case CONFIG_CONSTANT:
+			          break;
+		         case CONFIG_BYTE:
+			          ReadByte(hFileHandle, nIoResult, *(sbyte*)nxtDisplayLines[index].ptr);
+			          break;
+		          case CONFIG_SHORT:
+			          ReadShort(hFileHandle, nIoResult, *(short*)nxtDisplayLines[index].ptr);
+			          break;
+  	          case CONFIG_LONG:
+			          ReadLong(hFileHandle, nIoResult, *(long*)nxtDisplayLines[index].ptr);
+			          break;
+		          default:
+	 		          break;
+	      	  }
+	        }
+      	}
+        Close(hFileHandle, nIoResult);
+    }
+
+    for(int index = 0; index < ((iNumLines < 8)?iNumLines:8); index++){
+        switch(nxtDisplayLines[index].config){
+            case CONFIG_UNSET:
                 break;
-            case 2:
-                displayString(line, "%s%d%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].lp, nxtDisplayLines[line].units);
+            case CONFIG_CONSTANT:
+                displayString(index, "%s", nxtDisplayLines[index].desc);
                 break;
-            case 3:
-                displayString(line, "%s%d%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].ip, nxtDisplayLines[line].units);
+            case CONFIG_BYTE:
+                displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                 break;
-            case 4:
-                displayString(line, "%s%d%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].sp, nxtDisplayLines[line].units);
+            case CONFIG_SHORT:
+                displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                 break;
-            case 5:
-                displayString(line, "%s%.3f%s", nxtDisplayLines[line].desc, *nxtDisplayLines[line].fp, nxtDisplayLines[line].units);
+            case CONFIG_LONG:
+                displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(long*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                 break;
-            default:    //Line has not been set!
+            case CONFIG_BOOL:
+                sTemp = (*(bool*)nxtDisplayLines[index].ptr)?nxtDisplayLines[index].valTrue:nxtDisplayLines[index].valFalse;
+                displayString(index, "%s%s%s", nxtDisplayLines[index].desc, sTemp, nxtDisplayLines[index].units);
+                break;
+            case CONFIG_STRING:
+                displayString(index, "%s%s%s", nxtDisplayLines[index].desc, *(string*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                break;
+            case CONFIG_CHAR:
+                displayString(index, "%s%c%s", nxtDisplayLines[index].desc, *(char*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                 break;
         }
     }
-    //Begin reading for button interactions
+
+    while(nxtDisplayLines[iCurrentLine].config == CONFIG_CONSTANT)
+        iCurrentLine++;
+    for(int index = 7; index > 0; index--)
+        invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+
     while(true){
-        if(nNxtButtonPressed == 0 && !(ignoreNXTBut&1))
-            ignoreNXTBut |= 1;
-        else if(nNxtButtonPressed != 0 && (ignoreNXTBut&1)){
-            ignoreNXTBut ^= 1;
-            break;  //Exit
-        }
-        if(nNxtButtonPressed == 3 && !(ignoreNXTBut&4))
-            ignoreNXTBut |= 4;
-        else if(nNxtButtonPressed != 3 && ignoreNXTBut&4){
-            switch(nxtDisplayLines[nSelectedLine].config){
-                case 1:
-                		sTemp = *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse;
-                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, sTemp, nxtDisplayLines[nSelectedLine].units);
+        if(nNxtButtonPressed == 0){
+            if(!onPress)
+                while(nNxtButtonPressed == 0){}
+            displayClearTextLine(iCurrentLine);
+            switch(nxtDisplayLines[iCurrentLine].config){
+                case CONFIG_UNSET:
                     break;
-                case 2:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].lp, nxtDisplayLines[nSelectedLine].units);
+                case CONFIG_CONSTANT:
+                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
                     break;
-                case 3:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].ip, nxtDisplayLines[nSelectedLine].units);
+                case CONFIG_BYTE:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
-                case 4:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].sp, nxtDisplayLines[nSelectedLine].units);
+                case CONFIG_SHORT:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
-                case 5:
-                    displayString(nSelectedLine, "%s%.3f%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].fp, nxtDisplayLines[nSelectedLine].units);
+                case CONFIG_LONG:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
-                default:    //Line has not been set!
+                case CONFIG_BOOL:
+                    sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_STRING:
+                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_CHAR:
+                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
             }
             do{
-                if(++nSelectedLine > 7)
-                    nSelectedLine = (nxtDisplayLines[0].config)?0:(nxtDisplayLines[1].config)?1:
-                                    (nxtDisplayLines[2].config)?2:(nxtDisplayLines[3].config)?3:
-                                    (nxtDisplayLines[4].config)?4:(nxtDisplayLines[5].config)?5:
-                                    (nxtDisplayLines[6].config)?6:7;
-            }while(!nxtDisplayLines[nSelectedLine].config);
-            bValChanged = true;
-            ignoreNXTBut ^= 4;
-        }
-        if(nNxtButtonPressed == 1 && !(ignoreNXTBut&2)){
-            if(nxtDisplayLines[nSelectedLine].config == 1)
-                ignoreNXTBut |= 2;
-            else if(time1[T4] >= accelerate(250,100,2000,time1[T3])){
-                if(recent&1){
-                    clearTimer(T3);
-                    recent |= 1;
+                if(--iCurrentLine < 0)
+                    iCurrentLine = iNumLines;
+            }while(nxtDisplayLines[iCurrentLine].config <= 1);    //Constant or unset
+
+            if(iCurrentLine >= 5 && iNumLines > 7){
+                while(iCurrentLine - iOffset >= 5 && iNumLines - iCurrentLine > 2){
+                    iOffset--;
                 }
-                clearTimer(T4);
-                switch(nxtDisplayLines[nSelectedLine].config){
-                    case 2:
-                        *nxtDisplayLines[nSelectedLine].lp += nxtDisplayLines[nSelectedLine].incrementL;
-                        if(*nxtDisplayLines[nSelectedLine].lp > nxtDisplayLines[nSelectedLine].upperLimitL)
-                            *nxtDisplayLines[nSelectedLine].lp = nxtDisplayLines[nSelectedLine].upperLimitL;
-                        break;
-                    case 3:
-                        *nxtDisplayLines[nSelectedLine].ip += nxtDisplayLines[nSelectedLine].incrementI;
-                        if(*nxtDisplayLines[nSelectedLine].ip > nxtDisplayLines[nSelectedLine].upperLimitI)
-                            *nxtDisplayLines[nSelectedLine].ip = nxtDisplayLines[nSelectedLine].upperLimitI;
-                        break;
-                    case 4:
-                        *nxtDisplayLines[nSelectedLine].sp += nxtDisplayLines[nSelectedLine].incrementS;
-                        if(*nxtDisplayLines[nSelectedLine].sp > nxtDisplayLines[nSelectedLine].upperLimitS)
-                            *nxtDisplayLines[nSelectedLine].sp = nxtDisplayLines[nSelectedLine].upperLimitS;
-                        break;
-                    case 5:
-                        *nxtDisplayLines[nSelectedLine].fp += nxtDisplayLines[nSelectedLine].incrementF;
-                        if(*nxtDisplayLines[nSelectedLine].fp > nxtDisplayLines[nSelectedLine].upperLimitF)
-                            *nxtDisplayLines[nSelectedLine].fp = nxtDisplayLines[nSelectedLine].upperLimitF;
-                        break;
-                    default:
-                        break;
+                for(int index = 0; index <= 7; index++){
+                    switch(nxtDisplayLines[index].config){
+                        case CONFIG_UNSET:
+                            break;
+                        case CONFIG_CONSTANT:
+                            displayString(index, "%s", nxtDisplayLines[index].desc);
+                            break;
+                        case CONFIG_BYTE:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_SHORT:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_LONG:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(long*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_BOOL:
+                            sTemp = (*(bool*)nxtDisplayLines[index].ptr)?nxtDisplayLines[index].valTrue:nxtDisplayLines[index].valFalse;
+                            displayString(index, "%s%s%s", nxtDisplayLines[index].desc, sTemp, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_STRING:
+                            displayString(index, "%s%s%s", nxtDisplayLines[index].desc, *(string*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_CHAR:
+                            displayString(index, "%s%c%s", nxtDisplayLines[index].desc, *(char*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                    }
+                }
+            }else{
+            	displayClearTextLine(iCurrentLine);
+	            switch(nxtDisplayLines[iCurrentLine].config){
+	                case CONFIG_UNSET:
+	                    break;
+	                case CONFIG_CONSTANT:
+	                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
+	                    break;
+	                case CONFIG_BYTE:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_SHORT:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_LONG:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_BOOL:
+	                    sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+	                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_STRING:
+	                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_CHAR:
+	                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	            }
+	            for(int index = 7; index > 0; index--)
+        				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+	          }
+
+            if(onPress)
+                while(nNxtButtonPressed == 0){}
+
+            nNxtExitClicks = 2;
+        }	//if(nNxtButtonPressed == 0)
+        if(nNxtButtonPressed == 1){
+            if(nxtDisplayLines[iCurrentLine].config == CONFIG_BOOL){
+                if(!onPress)
+                    while(nNxtButtonPressed == 1){}
+                *(bool*)nxtDisplayLines[iCurrentLine].ptr = !*(bool*)nxtDisplayLines[iCurrentLine].ptr;
+                displayClearTextLine(iCurrentLine);
+                sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+				        displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+				        for(int index = 7; index > 0; index--)
+        					invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+                if(onPress)
+                    while(nNxtButtonPressed == 1){}
+            }else{
+                clearTimer(T1);
+                while(nNxtButtonPressed == 1){
+                    switch(nxtDisplayLines[iCurrentLine].config){
+                        case CONFIG_BYTE:
+                            *(sbyte*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
+                            if(*(sbyte*)nxtDisplayLines[iCurrentLine].ptr > nxtDisplayLines[iCurrentLine].upperLimit)
+                                *(sbyte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].upperLimit;
+                            break;
+                        case CONFIG_SHORT:
+                            *(short*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
+                            if(*(short*)nxtDisplayLines[iCurrentLine].ptr > nxtDisplayLines[iCurrentLine].upperLimit)
+                                *(short*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].upperLimit;
+                            break;
+                        case CONFIG_LONG:
+                            *(long*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
+                            if(*(long*)nxtDisplayLines[iCurrentLine].ptr > nxtDisplayLines[iCurrentLine].upperLimit)
+                                *(long*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].upperLimit;
+                            break;
+                        case CONFIG_STRING:
+                            if(++iArrayIndex[iCurrentLine] > nxtDisplayLines[iCurrentLine].arraySize)
+                                iArrayIndex[iCurrentLine] = nxtDisplayLines[iCurrentLine].arraySize;
+                            *(string*)nxtDisplayLines[iCurrentLine].ptr = *(string*)(nxtDisplayLines[iCurrentLine].ptr + iArrayIndex[iCurrentLine]);
+                            break;
+                        case CONFIG_CHAR:
+                            if(++iArrayIndex[iCurrentLine] > nxtDisplayLines[iCurrentLine].arraySize)
+                                iArrayIndex[iCurrentLine] = nxtDisplayLines[iCurrentLine].arraySize;
+                            *(char*)nxtDisplayLines[iCurrentLine].ptr = *(char*)(nxtDisplayLines[iCurrentLine].ptr + iArrayIndex[iCurrentLine]);
+                            break;
+                    }
+			              displayClearTextLine(iCurrentLine);
+				            switch(nxtDisplayLines[iCurrentLine].config){
+				                case CONFIG_UNSET:
+				                    break;
+				                case CONFIG_CONSTANT:
+				                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
+				                    break;
+				                case CONFIG_BYTE:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_SHORT:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_LONG:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_STRING:
+				                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_CHAR:
+				                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				            }
+				            for(int index = 7; index > 0; index--)
+			        				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+                    wait1Msec(accelerate(300, 50, 5000, time1[T1]));
                 }
             }
-        }else if(nNxtButtonPressed != 1){
-            if(ignoreNXTBut&2){
-                (*nxtDisplayLines[nSelectedLine].bp) = !(*nxtDisplayLines[nSelectedLine].bp);
-                bValChanged = true;
-                ignoreNXTBut ^= 2;
-            }
-            if(recent&1){
-                bValChanged = true;
-                recent ^= 1;
-            }
-        }
-        if(nNxtButtonPressed == 2 && !(ignoreNXTBut&3)){
-            if(nxtDisplayLines[nSelectedLine].config == 1)
-                ignoreNXTBut |= 3;
-            else if(time1[T4] >= accelerate(250,100,2000,time1[T3])){
-                if(recent&2){
-                    clearTimer(T3);
-                    recent |= 2;
+        }   //if(nNxtButtonPressed == 1)
+        if(nNxtButtonPressed == 2){
+            if(nxtDisplayLines[iCurrentLine].config == CONFIG_BOOL){
+                if(!onPress)
+                    while(nNxtButtonPressed == 2){}
+                *(bool*)nxtDisplayLines[iCurrentLine].ptr = !*(bool*)nxtDisplayLines[iCurrentLine].ptr;
+                displayClearTextLine(iCurrentLine);
+                sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+				        displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+				     		for(int index = 7; index > 0; index--)
+        					invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+                if(onPress)
+                    while(nNxtButtonPressed == 2){}
+            }else{
+                clearTimer(T1);
+                while(nNxtButtonPressed == 2){
+                    switch(nxtDisplayLines[iCurrentLine].config){
+                        case CONFIG_BYTE:
+                            *(sbyte*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
+                            if(*(sbyte*)nxtDisplayLines[iCurrentLine].ptr < nxtDisplayLines[iCurrentLine].lowerLimit)
+                                *(sbyte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].lowerLimit;
+                            break;
+                        case CONFIG_SHORT:
+                            *(short*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
+                            if(*(short*)nxtDisplayLines[iCurrentLine].ptr < nxtDisplayLines[iCurrentLine].lowerLimit)
+                                *(short*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].lowerLimit;
+                            break;
+                        case CONFIG_LONG:
+                            *(long*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
+                            if(*(long*)nxtDisplayLines[iCurrentLine].ptr < nxtDisplayLines[iCurrentLine].lowerLimit)
+                                *(long*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].lowerLimit;
+                            break;
+                        case CONFIG_STRING:
+                            if(--iArrayIndex[iCurrentLine] < 0)
+                                iArrayIndex[iCurrentLine] = 0;
+                            *(string*)nxtDisplayLines[iCurrentLine].ptr = *(string*)(nxtDisplayLines[iCurrentLine].ptr + iArrayIndex[iCurrentLine]);
+                            break;
+                        case CONFIG_CHAR:
+                            if(--iArrayIndex[iCurrentLine] < 0)
+                                iArrayIndex[iCurrentLine] = 0;
+                            *(char*)nxtDisplayLines[iCurrentLine].ptr = *(char*)(nxtDisplayLines[iCurrentLine].ptr + iArrayIndex[iCurrentLine]);
+                            break;
+                    }
+                    displayClearTextLine(iCurrentLine);
+				            switch(nxtDisplayLines[iCurrentLine].config){
+				                case CONFIG_UNSET:
+				                    break;
+				                case CONFIG_CONSTANT:
+				                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
+				                    break;
+				                case CONFIG_BYTE:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_SHORT:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_LONG:
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_STRING:
+				                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				                case CONFIG_CHAR:
+				                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    break;
+				            }
+				            for(int index = 7; index > 0; index--)
+			        				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+                    wait1Msec(accelerate(300, 50, 5000, time1[T1]));
                 }
-                clearTimer(T4);
-                switch(nxtDisplayLines[nSelectedLine].config){
-                    case 2:
-                        *nxtDisplayLines[nSelectedLine].lp -= nxtDisplayLines[nSelectedLine].incrementL;
-                        if(*nxtDisplayLines[nSelectedLine].lp < nxtDisplayLines[nSelectedLine].lowerLimitL)
-                            *nxtDisplayLines[nSelectedLine].lp = nxtDisplayLines[nSelectedLine].lowerLimitL;
-                        break;
-                    case 3:
-                        *nxtDisplayLines[nSelectedLine].ip -= nxtDisplayLines[nSelectedLine].incrementI;
-                        if(*nxtDisplayLines[nSelectedLine].ip < nxtDisplayLines[nSelectedLine].lowerLimitI)
-                            *nxtDisplayLines[nSelectedLine].ip = nxtDisplayLines[nSelectedLine].lowerLimitI;
-                        break;
-                    case 4:
-                        *nxtDisplayLines[nSelectedLine].sp -= nxtDisplayLines[nSelectedLine].incrementS;
-                        if(*nxtDisplayLines[nSelectedLine].sp < nxtDisplayLines[nSelectedLine].lowerLimitS)
-                            *nxtDisplayLines[nSelectedLine].sp = nxtDisplayLines[nSelectedLine].lowerLimitS;
-                        break;
-                    case 5:
-                        *nxtDisplayLines[nSelectedLine].fp -= nxtDisplayLines[nSelectedLine].incrementF;
-                        if(*nxtDisplayLines[nSelectedLine].fp < nxtDisplayLines[nSelectedLine].lowerLimitF)
-                            *nxtDisplayLines[nSelectedLine].fp = nxtDisplayLines[nSelectedLine].lowerLimitF;
-                        break;
-                    default:
-                        break;
+            }
+        }   //if(nNxtButtonPressed == 2)
+        if(nNxtButtonPressed == 3){
+        		clearTimer(T1);
+            if(!onPress)
+                while(nNxtButtonPressed == 3){}
+            displayClearTextLine(iCurrentLine);
+            switch(nxtDisplayLines[iCurrentLine].config){
+                case CONFIG_UNSET:
+                    break;
+                case CONFIG_CONSTANT:
+                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
+                    break;
+                case CONFIG_BYTE:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_SHORT:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_LONG:
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_BOOL:
+                    sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_STRING:
+                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+                case CONFIG_CHAR:
+                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    break;
+            }
+            do{
+                if(++iCurrentLine > iNumLines)
+                    iCurrentLine = 0;
+            }while(nxtDisplayLines[iCurrentLine].config <= 1);    //Constant or unset
+   			    if(iCurrentLine >= 5 && iNumLines > 7){
+                while(iCurrentLine - iOffset >= 5 && iNumLines - iCurrentLine > 2){
+                    iOffset--;
                 }
-            }
-        }else if(nNxtButtonPressed != 2){
-            if(ignoreNXTBut&3){
-                (*nxtDisplayLines[nSelectedLine].bp) = !(*nxtDisplayLines[nSelectedLine].bp);
-                bValChanged = true;
-                ignoreNXTBut ^= 3;
-            }
-            if(recent&2){
-                bValChanged = true;
-                recent ^= 2;
-            }
-        }
-        if(time1[T1] > 1000 || bValChanged){
-            switch(nxtDisplayLines[nSelectedLine].config){
-                case 1:
-                		sTemp = *nxtDisplayLines[nSelectedLine].bp?nxtDisplayLines[nSelectedLine].valTrue:nxtDisplayLines[nSelectedLine].valFalse;
-                    displayString(nSelectedLine, "%s%s%s", nxtDisplayLines[nSelectedLine].desc, sTemp, nxtDisplayLines[nSelectedLine].units);
-                    break;
-                case 2:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].lp, nxtDisplayLines[nSelectedLine].units);
-                    break;
-                case 3:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].ip, nxtDisplayLines[nSelectedLine].units);
-                    break;
-                case 4:
-                    displayString(nSelectedLine, "%s%d%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].sp, nxtDisplayLines[nSelectedLine].units);
-                    break;
-                case 5:
-                    displayString(nSelectedLine, "%s%.3f%s", nxtDisplayLines[nSelectedLine].desc, *nxtDisplayLines[nSelectedLine].fp, nxtDisplayLines[nSelectedLine].units);
-                    break;
-                default:    //Line has not been set!
-                    break;
-            }
-            if(bValChanged)
-                bValChanged = false;
-            clearTimer(T1);
-        }else if(time1[T1] > 500)
-            displayClearTextLine(nSelectedLine);
-#ifdef
-        getJoystickSettings(joystick);
-        if (!joystick.StopPgm)
-            break;
-#endif
-    }
+                for(int index = 0; index <= 7; index++){
+                    switch(nxtDisplayLines[index].config){
+                        case CONFIG_UNSET:
+                            break;
+                        case CONFIG_CONSTANT:
+                            displayString(index, "%s", nxtDisplayLines[index].desc);
+                            break;
+                        case CONFIG_BYTE:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_SHORT:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_LONG:
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(long*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_BOOL:
+                            sTemp = (*(bool*)nxtDisplayLines[index].ptr)?nxtDisplayLines[index].valTrue:nxtDisplayLines[index].valFalse;
+                            displayString(index, "%s%s%s", nxtDisplayLines[index].desc, sTemp, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_STRING:
+                            displayString(index, "%s%s%s", nxtDisplayLines[index].desc, *(string*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                        case CONFIG_CHAR:
+                            displayString(index, "%s%c%s", nxtDisplayLines[index].desc, *(char*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            break;
+                    }
+                }
+            }else{
+            	displayClearTextLine(iCurrentLine);
+	            switch(nxtDisplayLines[iCurrentLine].config){
+	                case CONFIG_UNSET:
+	                    break;
+	                case CONFIG_CONSTANT:
+	                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
+	                    break;
+	                case CONFIG_BYTE:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_SHORT:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_LONG:
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(long*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_BOOL:
+	                    sTemp = (*(bool*)nxtDisplayLines[iCurrentLine].ptr)?nxtDisplayLines[iCurrentLine].valTrue:nxtDisplayLines[iCurrentLine].valFalse;
+	                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, sTemp, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_STRING:
+	                    displayString(iCurrentLine-iOffset, "%s%s%s", nxtDisplayLines[iCurrentLine].desc, *(string*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	                case CONFIG_CHAR:
+	                    displayString(iCurrentLine-iOffset, "%s%c%s", nxtDisplayLines[iCurrentLine].desc, *(char*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    break;
+	            }
+	            for(int index = 7; index > 0; index--)
+        				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
+	          }
+            if(onPress)
+                while(nNxtButtonPressed == 3){}
+
+            if(time1[T1] > 500){ //Hold down the enter button for more than half a second and release to exit
+					    if(savePrefs){
+				    		Delete(kConfigFileName, nIoResult);
+				        OpenWrite(hFileHandle, nIoResult, kConfigFileName, nFileSize);
+				        if(nIoResult == ioRsltSuccess){
+					        for(int index = 0; index <= iNumLines; index++){
+					        	switch(nxtDisplayLines[index].config) {
+					     	     case CONFIG_UNSET:
+					   		       break;
+						          case CONFIG_CONSTANT:
+							          break;
+						         case CONFIG_BYTE:
+							          WriteByte(hFileHandle, nIoResult, *(sbyte*)nxtDisplayLines[index].ptr);
+							          break;
+						          case CONFIG_SHORT:
+							          WriteShort(hFileHandle, nIoResult, *(short*)nxtDisplayLines[index].ptr);
+							          break;
+				  	          case CONFIG_LONG:
+							          WriteLong(hFileHandle, nIoResult, *(long*)nxtDisplayLines[index].ptr);
+							          break;
+						          default:
+					 		          break;
+					      	  	}
+					        	}
+				      		}
+				        	Close(hFileHandle, nIoResult);
+					      }
+                eraseDisplay();
+                sleep(1);
+                eraseDisplay(); //In case failed first time
+                nNxtExitClicks = 1;
 #ifdef getJoystickSettings
-    bDisplayDiagnostics = true; //Resume NXT status display
+                startTask(displayDiagnostics);
 #endif
-}
-*/
-/*
-#ifdef getJoystickSettings
-void waitForStart(bool saveCPU, bool allowDisplayChanges)
-{
-    while (true)
-    {
-        getJoystickSettings(joystick);
-        if (!joystick.StopPgm)
-            break;
-        if(allowDisplayChanges && nNxtButtonPressed == 3){
-            while(nNxtButtonPressed == 3){/*Do Nothing*//*}
-            //startDisplay();
-        }
+                return;
+            }
+        }	//if(nNxtButtonPressed == 3)
     }
-    if(saveCPU)
-        stopTask(readMsgFromPC);
-    return;
 }
-#endif
-*/
+
 #endif //__AUTONOMOUS_FUNCS_H__
