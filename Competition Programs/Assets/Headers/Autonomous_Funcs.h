@@ -196,6 +196,7 @@ void startDisplay(bool onPress, bool savePrefs){
     string kConfigFileName = "DisplayConfig.txt";
     short nFileSize;
     bool bDelete = false;
+    byte iTemp;
 
     if(iNumLines == 0)
         return;
@@ -211,7 +212,7 @@ void startDisplay(bool onPress, bool savePrefs){
     eraseDisplay(); //In case screen glitches and does not erase everything the first time
 
     if(savePrefs){
-        nxtDisplayCenteredTextLine(3, "Delete Last Save?");
+        nxtDisplayCenteredTextLine(3, "Delete Last Save");
         nxtDisplayCenteredTextLine(4, "No");
         while(true){
         	if(nNxtButtonPressed == 3){
@@ -259,6 +260,10 @@ void startDisplay(bool onPress, bool savePrefs){
   	          case CONFIG_LONG:
 			          ReadLong(hFileHandle, nIoResult, *(long*)nxtDisplayLines[index].ptr);
 			          break;
+			         case CONFIG_BOOL:
+			         	ReadByte(hFileHandle, nIoResult, iTemp);
+			         	*(bool*)nxtDisplayLines[index].ptr = (iTemp != 0);
+			         	break;
 		          default:
 	 		          break;
 	      	  }
@@ -337,7 +342,7 @@ void startDisplay(bool onPress, bool savePrefs){
                     iCurrentLine = iNumLines;
             }while(nxtDisplayLines[iCurrentLine].config <= 1);    //Constant or unset
 
-            if(iCurrentLine >= 5 && iNumLines > 7){
+            if(false /*iCurrentLine >= 5 && iNumLines > 7*/){
                 while(iCurrentLine - iOffset >= 5 && iNumLines - iCurrentLine > 2){
                     iOffset--;
                 }
@@ -404,7 +409,7 @@ void startDisplay(bool onPress, bool savePrefs){
             if(onPress)
                 while(nNxtButtonPressed == 0){}
 
-            nNxtExitClicks = 2;
+            nNxtExitClicks += 1;
         }	//if(nNxtButtonPressed == 0)
         if(nNxtButtonPressed == 1){
             if(nxtDisplayLines[iCurrentLine].config == CONFIG_BOOL){
@@ -583,7 +588,7 @@ void startDisplay(bool onPress, bool savePrefs){
                 if(++iCurrentLine > iNumLines)
                     iCurrentLine = 0;
             }while(nxtDisplayLines[iCurrentLine].config <= 1);    //Constant or unset
-   			    if(iCurrentLine >= 5 && iNumLines > 7){
+   			    if(false /*iCurrentLine >= 5 && iNumLines > 7*/){
                 while(iCurrentLine - iOffset >= 5 && iNumLines - iCurrentLine > 2){
                     iOffset--;
                 }
@@ -669,6 +674,9 @@ void startDisplay(bool onPress, bool savePrefs){
 				  	          case CONFIG_LONG:
 							          WriteLong(hFileHandle, nIoResult, *(long*)nxtDisplayLines[index].ptr);
 							          break;
+			     				    case CONFIG_BOOL:
+			      				   	WriteByte(hFileHandle, nIoResult, (*(bool*)nxtDisplayLines[index].ptr)?1:0);
+			  				       	break;
 						          default:
 					 		          break;
 					      	  	}

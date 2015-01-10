@@ -1,5 +1,4 @@
 #pragma config(Hubs,  S1, HTServo,  HTMotor,  HTMotor,  none)
-#pragma config(Sensor, S1,     ,               sensorI2CMuxController)
 #pragma config(Sensor, S2,     ir,             sensorHiTechnicIRSeeker1200)
 #pragma config(Sensor, S3,     sonar,          sensorSONAR)
 #pragma config(Sensor, S4,     tMux,           sensorHiTechnicTouchMux)
@@ -8,7 +7,7 @@
 #pragma config(Motor,  mtr_S1_C3_1,     leftWheel,     tmotorTetrix, openLoop)
 #pragma config(Motor,  mtr_S1_C3_2,     rightWheel,    tmotorTetrix, openLoop)
 #pragma config(Servo,  srvo_S1_C1_1,    dragger,              tServoStandard)
-#pragma config(Servo,  srvo_S1_C1_2,    servo2,               tServoNone)
+#pragma config(Servo,  srvo_S1_C1_2,    scorer,               tServoStandard)
 #pragma config(Servo,  srvo_S1_C1_3,    servo3,               tServoNone)
 #pragma config(Servo,  srvo_S1_C1_4,    servo4,               tServoNone)
 #pragma config(Servo,  srvo_S1_C1_5,    servo5,               tServoNone)
@@ -18,45 +17,35 @@
 //	Motors are reversed so that the back is considered the front for easier programming	//
 
 #include "JoystickDriver.c"
-
-int reversed = 1;
-int leftOffset = 20;
-int rightOffset = 0;
+#include "Assets\Headers\Autonomous_Funcs.h"
+#include "Assets\Headers\h359_14-15.h"
 
 long waitDuration;
 bool ramp = true;
 bool kickstand = true;
 bool centerScore = true;
 
-int selectionLine = 1;
-int prevLine = 1;
-bool valChanged;
-
 int irPos;
 int centerRotation; //1 = kickstand facing alliance PZ, 2 = 45, 3 = 90
 
-void fwd(int speed, int duration);
-void bwd(int speed, int duration);
-void turnL(int speed, int duration);
-void turnR(int speed, int duration);
-void selectionScreen();
-
-task selectionFlash;
-
 task main()
 {
-	selectionScreen();
-	servoChangeRate[dragger] = 0;
-	servo[dragger] = 10;
+	configLine("Select Options: ");
+	configLine("Wait: ", &waitDuration, "ms", 0, 50, 5000);
+	configLine("", &ramp, "", "Ramp", "Parking Zone");
+	//configLine("KS: ", &kickstand, "", "Yes", "No");
+	configLine("Score in: ", &centerScore, "", "CG", "RG");
+	startDisplay(true, true);
+	initializeRobot();
 	//waitForStart();
+	//stopTask(readMsgFromPC);
 	wait1Msec(waitDuration);
-	reversed *= -1;
 	if(ramp){
-		fwd(30, 1500); //drive off ramp
-		fwd(50, 750); //drive towards goals
+		move(30, 2000, bwd); //drive off ramp
+		move(60, 500, bwd); //drive towards goals
 		if(centerScore){
 			//drag 60cm
-			servo[dragger] = 110;
+			servo[dragger] = DRAGGER_DOWN;
 			if(kickstand){
 				//knock down kickstand
 			}else{
@@ -72,8 +61,8 @@ task main()
 			//score in 90cm goal, drag back
 		}
 	}else{																				//Start in parking zone
-		fwd(30, 1500); //drive off ramp
-		fwd(50, 1000); //drive towards goals
+		//drive off ramp
+		//drive towards goals
 		if(centerScore){
 			//drag 60cm
 		}else{
@@ -88,185 +77,5 @@ task main()
 		}else{
 			//score in 90cm goal, drag back
 		}
-	}
-}
-
-void fwd(int speed, int duration){
-	int speedL = (speed - leftOffset)*reversed;
-	int speedR = (speed - rightOffset)*reversed;
-	motor[leftWheel] = speedL;
-	motor[rightWheel] = speedR;
-	wait1Msec(duration);
-	motor[leftWheel] = 0;
-	motor[rightWheel] = 0;
-	wait1Msec(100);
-}
-
-void bwd(int speed, int duration){
-	int speedL = (speed - leftOffset)*reversed;
-	int speedR = (speed - rightOffset)*reversed;
-	motor[leftWheel] = -speedL;
-	motor[rightWheel] = -speedR;
-	wait1Msec(duration);
-	motor[leftWheel] = 0;
-	motor[rightWheel] = 0;
-	wait1Msec(100);
-}
-
-void turnL(int speed, int duration){
-	int speedL = (speed - leftOffset)*reversed;
-	int speedR = (speed - rightOffset)*reversed;
-	motor[leftWheel] = -speedL;
-	motor[rightWheel] = speedR;
-	wait1Msec(duration);
-	motor[leftWheel] = 0;
-	motor[rightWheel] = 0;
-	wait1Msec(100);
-}
-
-void turnR(int speed, int duration){
-	int speedL = (speed - leftOffset)*reversed;
-	int speedR = (speed - rightOffset)*reversed;
-	motor[leftWheel] = speedL;
-	motor[rightWheel] = -speedR;
-	wait1Msec(duration);
-	motor[leftWheel] = 0;
-	motor[rightWheel] = 0;
-	wait1Msec(100);
-}
-
-void selectionScreen(){
-	nNxtExitClicks = 2;
-	bDisplayDiagnostics = false;
-	wait1Msec(100);
-	for(int line = 0; line <= 7; line++){
-		switch(line){
-			case 1:
-				nxtDisplayTextLine(1,"Wait(ms): %d",waitDuration);
-				break;
-			case 2:
-				nxtDisplayTextLine(2,"%s",ramp?"Ramp":"Parking Zone");
-				break;
-			case 3:
-				nxtDisplayTextLine(3,"%s",kickstand?"Kickstand":"No Kickstand");
-				break;
-			case 4:
-				nxtDisplayTextLine(4,"%s",centerScore?"Center Score":"RG Score");
-				break;
-			default:
-				nxtDisplayClearTextLine(line);
-				break;
-		}
-	}
-	startTask(selectionFlash);
-	while(true){
-		if(nNxtButtonPressed == 0){
-			while(nNxtButtonPressed == 0){}
-			stopTask(selectionFlash);
-			for(int line = 1; line <= 4; line++){
-				nxtDisplayClearTextLine(line);
-			}
-			bDisplayDiagnostics = true;
-			break;
-		}
-		if(nNxtButtonPressed == 1){
-			if(selectionLine == 1){
-				waitDuration += 250;
-				wait1Msec(250);
-				valChanged = true;
-				clearTimer(T2);
-			}
-			else{
-				while(nNxtButtonPressed == 1){}
-				switch(selectionLine){
-					case 2:
-						ramp = !ramp;
-						break;
-					case 3:
-						kickstand = !kickstand;
-						break;
-					case 4:
-						centerScore = !centerScore;
-						break;
-				}
-				valChanged = true;
-				clearTimer(T2);
-			}
-		}
-		if(nNxtButtonPressed == 2){
-			if(selectionLine == 1){
-				waitDuration -= 250;
-				if(waitDuration < 0) waitDuration = 0;
-				wait1Msec(250);
-				valChanged = true;
-				clearTimer(T2);
-			}
-			else{
-				while(nNxtButtonPressed == 2){}
-				switch(selectionLine){
-					case 2:
-						ramp = !ramp;
-						break;
-					case 3:
-						kickstand = !kickstand;
-						break;
-					case 4:
-						centerScore = !centerScore;
-						break;
-				}
-				valChanged = true;
-				clearTimer(T2);
-			}
-		}
-		if(nNxtButtonPressed == 3){
-			while(nNxtButtonPressed == 3){}
-			prevLine = selectionLine;
-			if(++selectionLine > 4)
-				selectionLine = 1;
-			switch(prevLine){
-				case 1:
-					nxtDisplayTextLine(1,"Wait(ms): %d",waitDuration);
-					break;
-				case 2:
-					nxtDisplayTextLine(2,"%s",ramp?"Ramp":"Parking Zone");
-					break;
-				case 3:
-					nxtDisplayTextLine(3,"%s",kickstand?"Kickstand":"No Kickstand");
-					break;
-				case 4:
-					nxtDisplayTextLine(4,"%s",centerScore?"Center Score":"RG Score");
-					break;
-			}
-		}
-		if(valChanged && time1(T2) > 100)
-			valChanged = false;
-	}
-}
-
-task selectionFlash{
-	while(true){
-		clearTimer(T1);
-		while(time1(T1) <= 500){
-			switch(selectionLine){
-				case 1:
-					nxtDisplayTextLine(1,"Wait(ms): %d",waitDuration);
-					break;
-				case 2:
-					nxtDisplayTextLine(2,"%s",ramp?"Ramp":"Parking Zone");
-					break;
-				case 3:
-					nxtDisplayTextLine(3,"%s",kickstand?"Kickstand":"No Kickstand");
-					break;
-				case 4:
-					nxtDisplayTextLine(4,"%s",centerScore?"Center Score":"RG Score");
-					break;
-			}
-		}
-		if(selectionLine == 1)
-			nxtDisplayTextLine(selectionLine,"Wait(ms): ");
-		else
-			nxtDisplayClearTextLine(selectionLine);
-		clearTimer(T1);
-		while(time1(T1) <= 500 && !valChanged){}
 	}
 }
