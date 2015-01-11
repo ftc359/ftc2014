@@ -3,6 +3,14 @@
 
 #pragma systemFile
 
+#ifndef RIGHT_OFFSET
+#define RIGHT_OFFSET	0
+#endif
+
+#ifndef LEFT_OFFSET
+#define LEFT_OFFSET	0
+#endif
+
 #ifndef  ENC_ERRORMARGIN       //To prevent encoder errors.
 #define  ENC_ERRORMARGIN   2000
 #endif
@@ -61,18 +69,18 @@ void startDisplay(bool onPress, bool savePrefs);
 
 void move(int power, long time, tDirection dir){
 #if defined(__HOLO_H__) && defined(DRIVEFR) && defined(DRIVEFL) && defined(DRIVEBR) && defined(DRIVEBL)
-    motor[DRIVEFL] = power*(dir & 1)?-1:1;
-    motor[DRIVEFR] = power*(dir & 2)?-1:1;
-    motor[DRIVEBL] = power*(dir & 1)?-1:1;
-    motor[DRIVEBR] = power*(dir & 2)?-1:1;
+    motor[DRIVEFL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVEFR] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
+    motor[DRIVEBL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVEBR] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
     wait1Msec(time);
     motor[DRIVEFL] = 0;
     motor[DRIVEFR] = 0;
     motor[DRIVEBL] = 0;
     motor[DRIVEBR] = 0;
 #elif defined(DRIVER) && defined(DRIVEL)
-    motor[DRIVEL] = power*(dir & 1)?-1:1;
-    motor[DRIVER] = power*(dir & 2)?-1:1;
+    motor[DRIVEL] = (power - LEFT_OFFSET)*((dir & 1)?-1:1);
+    motor[DRIVER] = (power - RIGHT_OFFSET)*((dir & 2)?-1:1);
     wait1Msec(time);
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
@@ -86,10 +94,10 @@ void moveEnc(int power, long distance, tDirection dir){
     nMotorEncoder[DRIVEBL] = 0;
     nMotorEncoder[DRIVEBR] = 0;
     wait1Msec(300); //wait for the encoders to calibrate
-    motor[DRIVEFL] = power*(dir & 1)?-1:1;
-    motor[DRIVEFR] = power*(dir & 2)?-1:1;
-    motor[DRIVEBL] = power*(dir & 1)?-1:1;
-    motor[DRIVEBR] = power*(dir & 2)?-1:1;
+    motor[DRIVEFL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVEFR] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
+    motor[DRIVEBL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVEBR] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
     while(nPrev[0] < distance && nPrev[1] < distance && nPrev[2] < distance && nPrev[3] < distance){
         nPrev[0] = (abs(nMotorEncoder[DRIVEFL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEFL]);
         nPrev[1] = (abs(nMotorEncoder[DRIVEFR]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVEFR]);
@@ -104,8 +112,8 @@ void moveEnc(int power, long distance, tDirection dir){
     nMotorEncoder[DRIVEL] = 0;
     nMotorEncoder[DRIVER] = 0;
     wait1Msec(300); //wait for the encoders to calibrate
-    motor[DRIVEL] = power*(dir & 1)?-1:1;
-    motor[DRIVER] = power*(dir & 2)?-1:1;
+    motor[DRIVEL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVER] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
     while(nPrev[0] < distance && nPrev[1] < distance){
         nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
         nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]);

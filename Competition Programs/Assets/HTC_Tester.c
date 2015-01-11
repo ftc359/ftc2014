@@ -55,7 +55,7 @@ void runMotor(int port, int channel, int mtr, byte power){
 }
 
 void runServo(int port, int channel, int ser, byte val){
-	int index = ((port-1)*8)+((channel-1)*2)+(ser-1);
+	int index = ((port-1)*24)+((channel-1)*6)+(ser-1);
 	HTSCServo(HTC(port), index, val);
 }
 
