@@ -38,17 +38,15 @@ task main()
 	configLine("Score in: ", &centerScore, "", "CG", "RG");
 	startDisplay(true, true);
 	initializeRobot();
-	//waitForStart();
+	waitForStart();
 	//stopTask(readMsgFromPC);
 	wait1Msec(waitDuration);
-	startTask(state_machine);
 	if(ramp){
-		move(35, 2000, bwd); //drive off ramp
-		//setSMstate(lift_move, 75, 1750);
-		move(35, 1500, bwd); //drive towards goals
+		move(35, 1250, bwd); //drive off ramp
+		moveLift(75, 2500);
+		move(35, 2750, bwd); //drive towards goals
 		if(centerScore){
 			//drag 60cm
-			servo[dragger] = DRAGGER_DOWN;
 			if(kickstand){
 				//knock down kickstand
 			}else{
@@ -56,29 +54,21 @@ task main()
 			//score in center goal and 60cm goal
 			//drag back the goal
 		}else{
-			servo[dragger] = DRAGGER_DOWN;
+			wait1Msec(500);
 			servo[scorer] = SCORER_OPEN;
+			while(servo[scorer] != SCORER_OPEN){}
 			wait1Msec(1000);
 			servo[scorer] = SCORER_CLOSE;
-			//setSMstate(lift_move, -10, 3500);
-			move(35, 750, right);
-			move(80, 3000, fwd);
-			move(50, 3000, right);
-			move(50, 2000, fwd);
-			servo[dragger] = DRAGGER_UP;
-			wait1Msec(100);
-			move(50, 2000, bwd);
-			move(50, 3000, left);
-			//setSMstate(lift_move, 50, 5000);
-			move(80, 3000, bwd);
-			move(35, 500, left);
-			move(50, 1000, fwd);
+			/*move(35, 750, fwd);
+			moveLift(-10, 2500);
+			move(35, 1000, left);
+			move(35, 2000, bwd);
 			motor[intake] = 100;
-			wait1Msec(1500);
-			servo[dragger] = DRAGGER_DOWN;
-			servo[scorer] = SCORER_OPEN;
 			wait1Msec(1000);
-			servo[scorer] = SCORER_CLOSE;
+			moveLift(75, 1000);
+			move(35, 1000, left);
+			move(35, 1000, bwd);
+			servo[scorer] = SCORER_OPEN;*/
 			//score in and drag 30cm
 			if(kickstand){
 				//knock down kickstand

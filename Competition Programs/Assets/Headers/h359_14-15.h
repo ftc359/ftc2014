@@ -5,13 +5,12 @@
 
 void initializeRobot();
 
-#define RIGHT_OFFSET	5
 #define DRIVER				rightWheel
 #define DRIVEL				leftWheel
 #define THRESHOLD			10
 
-const ubyte DRAGGER_UP = 100;
-const ubyte DRAGGER_DOWN = 90;
+const ubyte DRAGGER_UP = 0;
+const ubyte DRAGGER_DOWN = 20;
 
 const ubyte SCORER_OPEN = 155;
 const ubyte SCORER_CLOSE = 245;
@@ -23,44 +22,34 @@ void initializeRobot(){
 	servo[scorer] = SCORER_CLOSE;
 }
 
+bool busy = false;
 long target_time = 0;
 int target_power= 0;
 
-enum SMstate{
-	lift_stall = 0,
-	lift_move = 1
-};
-
-SMstate SM_State = lift_stall;
-
-void setSMstate(SMstate state, int power, long time){
-	SM_State = state;
-	target_power = power;
-	target_time = time;
+task liftTask(){
+	busy = true;
+	motor[lift] = target_power;
+	wait1Msec(target_time);
+	motor[lift] = 0;
+	busy = false;
 }
 
-task state_machine(){
-	long time_elapsed;
+void moveLift(int power, long time){
+	target_power = power;
+	target_time = time;
+	startTask(liftTask);
+}
+
+task bounceLift(){
 	while(true){
-		switch(SM_State){
-			case lift_stall:
-				if(motor[lift] != 0)
-					motor[lift] = 0;
-				time_elapsed = 0;
-				break;
-			case lift_move:
-				if(time_elapsed < target_time)
-					motor[lift] = target_power;
-				else{
-					time_elapsed = 0;
-					SM_State = lift_stall;
-				}
-				break;
-			default:
-				break;
-		}
-		wait1Msec(10);
-		time_elapsed += 10;
+		motor[lift] = 0;
+		wait1Msec(50);
+		motor[lift] = 80;
+		wait1Msec(500);
+		motor[lift] = 0;
+		wait1Msec(50);
+		motor[lift] = -20;
+		wait1Msec(500);
 	}
 }
 
