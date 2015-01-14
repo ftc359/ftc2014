@@ -41,7 +41,7 @@ task main()
 			stopTask(bounceLift);
 			bounce = false;
 			motor[lift] = joystickExponential(THRESHOLD,100,joystick.joy2_y2);
-		}else
+		}else if(bounce == false)
 			motor[lift] = 0;
 		if(toggleJ1B(5, true))
 			servo[dragger] = DRAGGER_UP;

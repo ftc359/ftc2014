@@ -35,7 +35,7 @@ enum tDirection{
     bwd = 3
 };
 
-struct nxtDisplayLineData{
+static struct nxtDisplayLineData{
     unsigned byte config;
     string desc;
     string units;
@@ -48,9 +48,9 @@ struct nxtDisplayLineData{
     string valFalse;
 };
 
-struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
+static struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
 
-int iLine;
+static int iLine;
 
 //Function prototypes
 void move(int power, long time, tDirection dir);

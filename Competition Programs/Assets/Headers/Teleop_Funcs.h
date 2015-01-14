@@ -39,7 +39,7 @@ int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
 void driveTank(int maxPower, bool exponential);
 void driveArcade(int maxPower, bool exponential, int joy);
 
-unsigned short nIgnoreJ1B, nIgnoreJ2B;  //2 bytes to use as booleans via bitmasking
+static unsigned short nIgnoreJ1B, nIgnoreJ2B;  //2 bytes to use as booleans via bitmasking
 
 bool toggleJ1B(int button, bool onPress){
     if(J1B(button) && !(nIgnoreJ1B & (1<<(button-1))))

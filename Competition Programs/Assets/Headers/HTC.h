@@ -21,6 +21,7 @@
 #define HTSC_POS_OFFSET			0x02
 #define HTSC_POS(CHAN)      0x01*CHAN
 #define HTSC_STEP_TIME      0x01
+#define HTSC_PWM_ENABLE			0x08
 
 tByteArray HTC_I2CRequest;
 tByteArray HTC_I2CReply;
@@ -199,9 +200,26 @@ bool HTMCPower(tSensors link, tMC mot, byte power){
 }
 
 bool HTSCServo(tSensors link, tSC ser, ubyte pos){
-    memset(HTC_I2CRequest, 0, sizeof(tByteArray));
-    int controller_channel = (int)(floor(ser/2)%4)+1;
+	  memset(HTC_I2CRequest, 0, sizeof(tByteArray));
+    int controller_channel = (int)(floor(ser/6)%4)+1;
     int servo_channel = ser%6;
+
+    HTC_I2CRequest[0] = 2;
+    HTC_I2CRequest[1] = HTC_I2C_ADDR(controller_channel);
+    HTC_I2CRequest[2] = HTSC_OFFSET + HTSC_PWM_ENABLE;
+
+    writeI2C(link, HTC_I2CRequest, HTC_I2CReply, 1);
+
+    if((ubyte)HTC_I2CReply[0] == 255){
+	    memset(HTC_I2CRequest, 0, sizeof(tByteArray));
+
+	    HTC_I2CRequest[0] = 3;
+	    HTC_I2CRequest[1] = HTC_I2C_ADDR(controller_channel);
+	    HTC_I2CRequest[2] = HTSC_OFFSET + HTSC_PWM_ENABLE;
+	    HTC_I2CRequest[3] = 140;
+	  }
+
+    memset(HTC_I2CRequest, 0, sizeof(tByteArray));
 
     HTC_I2CRequest[0] = 3;
     HTC_I2CRequest[1] = HTC_I2C_ADDR(controller_channel);

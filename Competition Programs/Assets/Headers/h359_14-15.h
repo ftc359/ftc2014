@@ -10,10 +10,10 @@ void initializeRobot();
 #define THRESHOLD			10
 
 const ubyte DRAGGER_UP = 0;
-const ubyte DRAGGER_DOWN = 20;
+const ubyte DRAGGER_DOWN = 255;
 
-const ubyte SCORER_OPEN = 155;
-const ubyte SCORER_CLOSE = 245;
+const ubyte SCORER_OPEN = 100;
+const ubyte SCORER_CLOSE = 0;
 
 void initializeRobot(){
 	servoChangeRate[dragger] = 0;
@@ -48,7 +48,7 @@ task bounceLift(){
 		wait1Msec(500);
 		motor[lift] = 0;
 		wait1Msec(50);
-		motor[lift] = -20;
+		motor[lift] = -30;
 		wait1Msec(500);
 	}
 }
