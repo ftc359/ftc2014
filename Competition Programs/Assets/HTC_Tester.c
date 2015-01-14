@@ -6,24 +6,15 @@
 
 #include "Headers\HTC.h"
 
-int nMenuLevel;
-int nPrevMenuLevel;
-int nPort;
-int nPrevPort;
-bool bTransitionFinished = true;
-
 struct mtr{
-	int power;
-	int prevPower;
+	sbyte power;
 };
 struct srvo{
-	int val;
-	int prevVal;
+	ubyte val;
 };
 struct channel{
 	int type;
-	int nSelectedLine;
-	int nPrevSelectedLine;
+	int selectedLine;
 	struct mtr mtrs[2];
 	struct srvo srvos[6];
 };
@@ -31,7 +22,6 @@ struct port{
 	struct channel chans[4];
 	bool available;
 	int channel;
-	int prevChannel;
 };
 
 struct port ports[4];
@@ -63,15 +53,21 @@ int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
 	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
 }
 
-task updateDisplay();
+void highlightLine(int line){
+	for(int index = 7; index > 0; index--)
+		invertLine(0, ((7-line)*8)+index, 99, ((7-line)*8)+index);
+}
 
 task main()
 {
+	int iMenuLevel = 0;
+	int iPrevMenuLevel = -1;
+	int iPort;
+	int iMinPort;
+	int iMaxPort;
+	int iMinChannel;
+	int iMaxChannel;
 	string sTemp[4];
-	int nMinPort;
-	int nMaxPort;
-	int nMinChannel;
-	int nMaxChannel;
 
 	displayString(3, "Initializing...");
 	for(int tPort = 0; tPort < 4; tPort++){
@@ -99,117 +95,153 @@ task main()
 		sTemp[chain_index] = (ports[tPort].chans[chain_index].type <= 0)?"NA":(ports[tPort].chans[chain_index].type == 1)?"MC":"SC";
 		}
 		displayCenteredTextLine(1+(tPort*2), "%s  %s  %s  %s", sTemp[0], sTemp[1], sTemp[2], sTemp[3]);
+		if(ports[tPort].available)
+			highlightLine(1+(tPort*2));
 	}
 	wait1Msec(3000);
+	eraseDisplay();
 
-	nMinPort = (ports[0].available)?0:(ports[1].available)?1:(ports[2].available)?2:3;
-	nMaxPort = (ports[3].available)?3:(ports[2].available)?2:(ports[1].available)?1:0;
-	nPort = nMinPort;
-	if(nMinPort == nMaxPort) //Only One Port Available
-		nMenuLevel = 1;				 //Skip port selection Process
-
-	startTask(updateDisplay);
+	iMinPort = (ports[0].available)?0:(ports[1].available)?1:(ports[2].available)?2:3;
+	iMaxPort = (ports[3].available)?3:(ports[2].available)?2:(ports[1].available)?1:0;
+	iPort = iMinPort;
 
 	while(true){
 		//Port selection
-
 		while(true){
-			if(nMenuLevel != 0)
+			if(iMenuLevel != 0)
 				break;
-			if(nPrevMenuLevel != nMenuLevel){
-				bTransitionFinished = true;
-				nPrevMenuLevel = nMenuLevel;
+			while(nNxtButtonPressed == 3){}
+			if(iMinPort == iMaxPort){ //Only One Port Available
+				iMenuLevel = 1;				 //Skip port selection Process
+				break;
+			}
+			if(iPrevMenuLevel != iMenuLevel){
+				eraseDisplay();
+				sleep(10);
+				displayCenteredTextLine(1, "Select A Port");
+				displayCenteredTextLine(3, "[S%d]", iPort+1);
+				highlightLine(3);
+				iPrevMenuLevel = iMenuLevel;
 			}
 			if(nNxtButtonPressed == 1){
 				do{
-					if(++nPort > nMaxPort)
-						nPort = nMaxPort;
-				}while(!ports[nPort].available);
-			}
+					if(++iPort > iMaxPort)
+						iPort = iMaxPort;
+				}while(!ports[iPort].available);
+				displayClearTextLine(3);
+				displayCenteredTextLine(3, "[S%d]", iPort+1);
+				highlightLine(3);
 				while(nNxtButtonPressed == 1){}
+			}
 			if(nNxtButtonPressed == 2){
 				do{
-					if(--nPort < nMinPort)
-						nPort = nMinPort;
-				}while(!ports[nPort].available);
-			}
+					if(--iPort < iMinPort)
+						iPort = iMinPort;
+				}while(!ports[iPort].available);
+				displayClearTextLine(3);
+				displayCenteredTextLine(3, "[S%d]", iPort+1);
+				highlightLine(3);
 				while(nNxtButtonPressed == 2){}
+			}
 			if(nNxtButtonPressed == 3){
-				while(nNxtButtonPressed == 3){}
-				nMenuLevel = 1;
+				iMenuLevel = 1;
 				nNxtExitClicks = 2;
 				break;
 			}
 		}
 		//Channel Selection
-		nMinChannel = (ports[nPort].chans[0].type > 0)?0:(ports[nPort].chans[1].type > 0)?1:(ports[nPort].chans[2].type > 0)?2:3;
-		nMaxChannel = (ports[nPort].chans[3].type > 0)?3:(ports[nPort].chans[2].type > 0)?2:(ports[nPort].chans[1].type > 0)?1:0;
+		iMinChannel = (ports[iPort].chans[0].type > 0)?0:(ports[iPort].chans[1].type > 0)?1:(ports[iPort].chans[2].type > 0)?2:3;
+		iMaxChannel = (ports[iPort].chans[3].type > 0)?3:(ports[iPort].chans[2].type > 0)?2:(ports[iPort].chans[1].type > 0)?1:0;
 
 		while(true){
-			if(nMenuLevel != 1)
+			if(iMenuLevel != 1)
 				break;
-			if(nMinChannel == nMaxChannel)	//Only One Channel Available
-				nMenuLevel = 2;
-			if(nPrevMenuLevel != nMenuLevel){
-				bTransitionFinished = true;
-				nPrevMenuLevel = nMenuLevel;
+			while(nNxtButtonPressed == 3){}
+			if(iMinChannel == iMaxChannel){	//Only One Channel Available
+				iMenuLevel = 2;
+				break;
+			}
+			if(iPrevMenuLevel != iMenuLevel){
+				eraseDisplay();
+				sleep(10);
+				displayCenteredTextLine(0, "[S%d]", iPort+1);
+				displayCenteredTextLine(1, "Select A Channel");
+				displayCenteredTextLine(3, "[C%d]", ports[iPort].channel+1);
+				highlightLine(3);
+				iPrevMenuLevel = iMenuLevel;
 			}
 			if(nNxtButtonPressed == 0){
-				while(nNxtButtonPressed == 0){}
-				nMenuLevel = 0;
+				iMenuLevel = 0;
 				break;
 			}
 			if(nNxtButtonPressed == 1){
 				do{
-					if(++ports[nPort].channel > nMaxChannel)
-						ports[nPort].channel = nMaxChannel;
-				}while(ports[nPort].chans[ports[nPort].channel].type <= 0);
+					if(++ports[iPort].channel > iMaxChannel)
+						ports[iPort].channel = iMaxChannel;
+				}while(ports[iPort].chans[ports[iPort].channel].type <= 0);
+				displayClearTextLine(3);
+				displayCenteredTextLine(3, "[C%d]", ports[iPort].channel+1);
+				highlightLine(3);
 				while(nNxtButtonPressed == 1){}
 			}
 			if(nNxtButtonPressed == 2){
 				do{
-					if(--ports[nPort].channel < nMinChannel)
-						ports[nPort].channel = nMinChannel;
-				}while(ports[nPort].chans[ports[nPort].channel].type <= 0);
+					if(--ports[iPort].channel < iMinChannel)
+						ports[iPort].channel = iMinChannel;
+				}while(ports[iPort].chans[ports[iPort].channel].type <= 0);
+				displayClearTextLine(3);
+				displayCenteredTextLine(3, "[C%d]", ports[iPort].channel+1);
+				highlightLine(3);
 				while(nNxtButtonPressed == 2){}
 			}
 			if(nNxtButtonPressed == 3){
-				while(nNxtButtonPressed == 3){}
-				nMenuLevel = 2;
+				iMenuLevel = 2;
 				nNxtExitClicks = 2;
 				break;
 			}
 		}
 		//Running
 		while(true){
-			if(nMenuLevel != 2)
+			if(iMenuLevel != 2)
 				break;
-			if(nPrevMenuLevel != nMenuLevel){
-				bTransitionFinished = true;
-				nPrevMenuLevel = nMenuLevel;
-			}
-			if(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 0){
-				ports[nPort].chans[ports[nPort].channel].nPrevSelectedLine = 2;
-				ports[nPort].chans[ports[nPort].channel].nSelectedLine = 2;
+			while(nNxtButtonPressed == 3){}
+			if(ports[iPort].chans[ports[iPort].channel].selectedLine == 0)
+				ports[iPort].chans[ports[iPort].channel].selectedLine = 2;
+			if(iPrevMenuLevel != iMenuLevel){
+				eraseDisplay();
+				sleep(10);
+				displayCenteredTextLine(0, "[S%d][C%d]", iPort+1, ports[iPort].channel+1);
+				if(ports[iPort].chans[ports[iPort].channel].type == 1){		//Motor Controller
+					displayString(2, "Motor 1: %d", ports[iPort].chans[ports[iPort].channel].mtrs[0].power);
+					displayString(4, "Motor 2: %d", ports[iPort].chans[ports[iPort].channel].mtrs[1].power);
+					highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+				}else{	//Servo Controller
+					for(int index = 0; index <= 5; index++)
+						displayString(2+index, "Servo %d: %d", index+1, ports[iPort].chans[ports[iPort].channel].srvos[index].val);
+					highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+				}
+				iPrevMenuLevel = iMenuLevel;
 			}
 			if(nNxtButtonPressed == 0){
-				while(nNxtButtonPressed == 0){}
-				nMenuLevel = 1;
+				iMenuLevel = 1;
 				break;
 			}
-			if(ports[nPort].chans[ports[nPort].channel].type == 1){				//Motor Controller
+			if(ports[iPort].chans[ports[iPort].channel].type == 1){				//Motor Controller
 				if(nNxtButtonPressed == 1){
 					clearTimer(T2);
 					while(nNxtButtonPressed == 1){
 						if(time1[T2] <= 250)
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power++;
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power++;
 						else{
-							if(ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power%5 != 0)
-								ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power += 5-(ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power%5);
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power += 5;
+							if(ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power%5 != 0)
+								ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power += 5-(ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power%5);
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power += 5;
 						}
-						if(ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power > 100)
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power = 100;
+						if(ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power > 100)
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power = 100;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Motor %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine/2, ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
 						if(time1[T2] <= 3000)
 							wait1Msec(accelerate(250,75,3000,time1[T2]));
 						else
@@ -220,14 +252,17 @@ task main()
 					clearTimer(T2);
 					while(nNxtButtonPressed == 2){
 						if(time1[T2] <= 250)
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power--;
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power--;
 						else{
-							if(ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power%5 != 0)
-								ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power -= (ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power%5);
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power -= 5;
+							if(ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power%5 != 0)
+								ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power -= (ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power%5);
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power -= 5;
 						}
-						if(ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power < -100)
-							ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power = -100;
+						if(ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power < -100)
+							ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power = -100;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Motor %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine/2, ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
 						if(time1[T2] <= 3000)
 							wait1Msec(accelerate(250,75,3000,time1[T2]));
 						else
@@ -236,88 +271,86 @@ task main()
 				}
 				if(nNxtButtonPressed == 3){
 					clearTimer(T2);
-					while(time1(T2) <= 500 && nNxtButtonPressed != -1){}
+					while(time1(T2) <= 500 && nNxtButtonPressed == 3){}
 					if(time1[T2] <= 500){
-						ports[nPort].chans[ports[nPort].channel].nSelectedLine += 2;
-						if(ports[nPort].chans[ports[nPort].channel].nSelectedLine > 4)
-							ports[nPort].chans[ports[nPort].channel].nSelectedLine = 2;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Motor %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine/2, ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power);
+						ports[iPort].chans[ports[iPort].channel].selectedLine += 2;
+						if(ports[iPort].chans[ports[iPort].channel].selectedLine > 4)
+							ports[iPort].chans[ports[iPort].channel].selectedLine = 2;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Motor %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine/2, ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
 					}else{
 						displayString(6, "Running...");
-						stopTask(updateDisplay);
-						displayString(2, "Motor 1: %d", ports[nPort].chans[ports[nPort].channel].mtrs[0].power);
-						displayString(4, "Motor 2: %d", ports[nPort].chans[ports[nPort].channel].mtrs[1].power);
-						while(nNxtButtonPressed == 3){
-							runMotor(nPort+1, ports[nPort].channel+1, (ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?1:2, ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power);
-						}
-						runMotor(nPort+1, ports[nPort].channel+1, (ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?1:2, 0);
+						while(nNxtButtonPressed == 3)
+							runMotor(iPort+1, ports[iPort].channel+1, (ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?1:2, ports[iPort].chans[ports[iPort].channel].mtrs[(ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?0:1].power);
+						runMotor(iPort+1, ports[iPort].channel+1, (ports[iPort].chans[ports[iPort].channel].selectedLine == 2)?1:2, 0);
 						displayClearTextLine(6);
-						startTask(updateDisplay);
 					}
-				}else if(ports[nPort].chans[ports[nPort].channel].type == 2){	//Servo Controller
 				}
-			}
-		}
-	}
-}
-
-task updateDisplay()
-{
-	while(true){
-		switch(nMenuLevel){
-		case 0:
-			if(bTransitionFinished || nPrevPort != nPort || time1[T1] > 1000){
-				if(bTransitionFinished){
-					eraseDisplay();
-					nxtDisplayCenteredTextLine(1, "Select A Port");
-					bTransitionFinished = false;
-				}
-				nxtDisplayCenteredTextLine(3, "[S%d]", nPort+1);
-				nPrevPort = nPort;
-				clearTimer(T1);
-				break;
-			}
-			if(time1[T1] > 500)
-				displayClearTextLine(3);
-			break;
-		case 1:
-			if(bTransitionFinished || ports[nPort].prevChannel != ports[nPort].channel || time1[T1] > 1000){
-				if(bTransitionFinished){
-					eraseDisplay();
-					nxtDisplayCenteredTextLine(0, "[S%d]", nPort+1);
-					nxtDisplayCenteredTextLine(1, "Select A Channel");
-					bTransitionFinished = false;
-				}
-				nxtDisplayCenteredTextLine(3, "[C%d]", ports[nPort].channel+1);
-				ports[nPort].prevChannel = ports[nPort].channel;
-				clearTimer(T1);
-				break;
-			}
-			if(time1[T1] > 500)
-				displayClearTextLine(3);
-			break;
-		case 2:
-			if(ports[nPort].chans[ports[nPort].channel].type == 1){				//Motor Controller
-				if(bTransitionFinished || ports[nPort].chans[ports[nPort].channel].nPrevSelectedLine != ports[nPort].chans[ports[nPort].channel].nSelectedLine ||
-					ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].prevPower !=  ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power || time1[T1] > 1000){
-					if(bTransitionFinished){
-						eraseDisplay();
-						nxtDisplayCenteredTextLine(0, "[S%d][C%d]", nPort+1, ports[nPort].channel+1);
-						bTransitionFinished = false;
+			}else if(ports[iPort].chans[ports[iPort].channel].type == 2){	//Servo Controller
+					if(nNxtButtonPressed == 1){
+					clearTimer(T2);
+					while(nNxtButtonPressed == 1){
+						if(time1[T2] <= 250)
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val++;
+						else{
+							if(ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val%5 != 0)
+								ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val += 5-(ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val%5);
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val += 5;
+						}
+						if(ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val > 255)
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val = 255;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Servo %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2]);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						if(time1[T2] <= 3000)
+							wait1Msec(accelerate(250,75,3000,time1[T2]));
+						else
+							wait1Msec(75);
 					}
-					displayClearTextLine(2);
-					displayClearTextLine(4);
-					displayString(2, "Motor 1: %d", ports[nPort].chans[ports[nPort].channel].mtrs[0].power);
-					displayString(4, "Motor 2: %d", ports[nPort].chans[ports[nPort].channel].mtrs[1].power);
-					ports[nPort].chans[ports[nPort].channel].nPrevSelectedLine = ports[nPort].chans[ports[nPort].channel].nSelectedLine;
-					ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].prevPower = ports[nPort].chans[ports[nPort].channel].mtrs[(ports[nPort].chans[ports[nPort].channel].nSelectedLine == 2)?0:1].power;
-					clearTimer(T1);
-					break;
 				}
-				if(time1[T1] > 500)
-					displayClearTextLine(ports[nPort].chans[ports[nPort].channel].nSelectedLine);
-			}else if(ports[nPort].chans[ports[nPort].channel].type == 2){	//Servo Controller
+				if(nNxtButtonPressed == 2){
+					clearTimer(T2);
+					while(nNxtButtonPressed == 2){
+						if(time1[T2] <= 250)
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val--;
+						else{
+							if(ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val%5 != 0)
+								ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val -= (ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val%5);
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val -= 5;
+						}
+						if(ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val < 0)
+							ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val = 0;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Servo %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						if(time1[T2] <= 3000)
+							wait1Msec(accelerate(250,75,3000,time1[T2]));
+						else
+							wait1Msec(75);
+					}
+				}
+				if(nNxtButtonPressed == 3){
+					clearTimer(T2);
+					while(time1(T2) <= 500 && nNxtButtonPressed == 3){}
+					if(time1[T2] <= 500){
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Servo %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2]);
+						if(++ports[iPort].chans[ports[iPort].channel].selectedLine > 7)
+							ports[iPort].chans[ports[iPort].channel].selectedLine = 2;
+						displayClearTextLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+						displayString(ports[iPort].chans[ports[iPort].channel].selectedLine, "Servo %d: %d", ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2]);
+						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
+					}else{
+						displayString(1, "Running...");
+						while(nNxtButtonPressed == 3)
+							runServo(iPort+1, ports[iPort].channel+1, ports[iPort].chans[ports[iPort].channel].selectedLine-2, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val);
+						displayClearTextLine(1);
+					}
+				}
 			}
-			break;
 		}
 	}
 }
