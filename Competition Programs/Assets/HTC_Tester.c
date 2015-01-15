@@ -7,10 +7,10 @@
 #include "Headers\HTC.h"
 
 struct mtr{
-	sbyte power;
+	int power;
 };
 struct srvo{
-	ubyte val;
+	int val;
 };
 struct channel{
 	int type;
@@ -44,9 +44,9 @@ void runMotor(int port, int channel, int mtr, byte power){
   HTMCPower(HTC(port), index, power);
 }
 
-void runServo(int port, int channel, int ser, byte val){
+void runServo(int port, int channel, int ser, byte val, tSCPWM mode){
 	int index = ((port-1)*24)+((channel-1)*6)+(ser-1);
-	HTSCServo(HTC(port), index, val);
+	HTSCServo(HTC(port), index, val, mode);
 }
 
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
@@ -345,8 +345,9 @@ task main()
 						highlightLine(ports[iPort].chans[ports[iPort].channel].selectedLine);
 					}else{
 						displayString(1, "Running...");
-						while(nNxtButtonPressed == 3)
-							runServo(iPort+1, ports[iPort].channel+1, ports[iPort].chans[ports[iPort].channel].selectedLine-2, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val);
+						runServo(iPort+1, ports[iPort].channel+1, ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val, disable_timeout);
+						while(nNxtButtonPressed == 3){}
+						runServo(iPort+1, ports[iPort].channel+1, ports[iPort].chans[ports[iPort].channel].selectedLine-1, ports[iPort].chans[ports[iPort].channel].srvos[ports[iPort].chans[ports[iPort].channel].selectedLine-2].val, force_timeout);
 						displayClearTextLine(1);
 					}
 				}

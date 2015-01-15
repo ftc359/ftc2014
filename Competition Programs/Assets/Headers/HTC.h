@@ -7,7 +7,7 @@
 #include "Xander's Drivers\common.h"
 #endif
 
-#define HTC_I2C_ADDR_1      0x02 //Address of the first motor_controller
+#define HTC_I2C_ADDR_1      0x02 //Address of the first controller
 #define HTC_I2C_ADDR(CHAN)  HTC_I2C_ADDR_1*CHAN
 
 #define HTC_TYPE            0x10
@@ -160,6 +160,12 @@ enum tSC{
     servo_S4_C4_6 = 95
 };
 
+enum tSCPWM{
+	reset_timeout = 0x00,
+	disable_timeout = 0xAA,
+	force_timeout = 0xFF
+};
+
 int HTCVerifyType(tSensors link, ubyte channel){
     memset(HTC_I2CRequest, 0, sizeof(tByteArray));
     HTC_I2CRequest[0] = 2;
@@ -199,7 +205,7 @@ bool HTMCPower(tSensors link, tMC mot, byte power){
     return writeI2C(link, HTC_I2CRequest);
 }
 
-bool HTSCServo(tSensors link, tSC ser, ubyte pos){
+bool HTSCServo(tSensors link, tSC ser, ubyte pos, tSCPWM mode){
 	  memset(HTC_I2CRequest, 0, sizeof(tByteArray));
     int controller_channel = (int)(floor(ser/6)%4)+1;
     int servo_channel = ser%6;
@@ -210,13 +216,15 @@ bool HTSCServo(tSensors link, tSC ser, ubyte pos){
 
     writeI2C(link, HTC_I2CRequest, HTC_I2CReply, 1);
 
-    if((ubyte)HTC_I2CReply[0] == 255){
+    if((int)HTC_I2CReply[0] != mode){
 	    memset(HTC_I2CRequest, 0, sizeof(tByteArray));
 
 	    HTC_I2CRequest[0] = 3;
 	    HTC_I2CRequest[1] = HTC_I2C_ADDR(controller_channel);
 	    HTC_I2CRequest[2] = HTSC_OFFSET + HTSC_PWM_ENABLE;
-	    HTC_I2CRequest[3] = 140;
+	    HTC_I2CRequest[3] = mode;
+
+	    writeI2C(link, HTC_I2CRequest);
 	  }
 
     memset(HTC_I2CRequest, 0, sizeof(tByteArray));
