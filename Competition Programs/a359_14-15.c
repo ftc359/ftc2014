@@ -22,8 +22,13 @@
 #include "Assets\Headers\Autonomous_Funcs.h"
 
 long waitDuration;
+long fill3;
+long fill4;
+
 bool ramp = true;
+bool fill;
 bool kickstand = true;
+bool fill2;
 bool centerScore = true;
 
 int irPos;
@@ -34,7 +39,7 @@ task main()
 	configLine("Select Options: ");
 	configLine("Wait: ", &waitDuration, "ms", 0, 50, 5000);
 	configLine("", &ramp, "", "Ramp", "Parking Zone");
-	//configLine("KS: ", &kickstand, "", "Yes", "No");
+	configLine("KS: ", &kickstand, "", "Yes", "No");
 	configLine("Score in: ", &centerScore, "", "CG", "RG");
 	startDisplay(true, true);
 	initializeRobot();

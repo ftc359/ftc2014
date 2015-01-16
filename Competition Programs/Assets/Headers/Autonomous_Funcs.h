@@ -35,7 +35,7 @@ enum tDirection{
     bwd = 3
 };
 
-static struct nxtDisplayLineData{
+struct nxtDisplayLineData{
     unsigned byte config;
     string desc;
     string units;
@@ -48,9 +48,9 @@ static struct nxtDisplayLineData{
     string valFalse;
 };
 
-static struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
+struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
 
-static int iLine;
+int iLine;
 
 //Function prototypes
 void move(int power, long time, tDirection dir);
@@ -564,7 +564,7 @@ void startDisplay(bool onPress, bool savePrefs){
         if(nNxtButtonPressed == 3){
         		clearTimer(T1);
             if(!onPress)
-                while(nNxtButtonPressed == 3){}
+                while(nNxtButtonPressed == 3 && time1[T1] <= 500){}
             displayClearTextLine(iCurrentLine);
             switch(nxtDisplayLines[iCurrentLine].config){
                 case CONFIG_UNSET:
@@ -660,9 +660,9 @@ void startDisplay(bool onPress, bool savePrefs){
         				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
 	          }
             if(onPress)
-                while(nNxtButtonPressed == 3){}
+                while(nNxtButtonPressed == 3 && time1[T1] <= 500){}
 
-            if(time1[T1] > 500){ //Hold down the enter button for more than half a second and release to exit
+            if(time1[T1] > 1000){ //Hold down the enter button for more than a second and release to exit
 					    if(savePrefs){
 				    		Delete(kConfigFileName, nIoResult);
 				        OpenWrite(hFileHandle, nIoResult, kConfigFileName, nFileSize);

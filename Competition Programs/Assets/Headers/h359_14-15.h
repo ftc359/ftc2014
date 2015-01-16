@@ -12,8 +12,9 @@ void initializeRobot();
 const ubyte DRAGGER_UP = 0;
 const ubyte DRAGGER_DOWN = 255;
 
-const ubyte SCORER_OPEN = 100;
-const ubyte SCORER_CLOSE = 0;
+const ubyte SCORER_OPEN_CG = 180;
+const ubyte SCORER_OPEN_RG = 65;
+const ubyte SCORER_CLOSE = 240;
 
 void initializeRobot(){
 	servoChangeRate[dragger] = 0;
@@ -42,13 +43,9 @@ void moveLift(int power, long time){
 
 task bounceLift(){
 	while(true){
-		motor[lift] = 0;
-		wait1Msec(50);
-		motor[lift] = 80;
+		motor[lift] = 50;
 		wait1Msec(500);
-		motor[lift] = 0;
-		wait1Msec(50);
-		motor[lift] = -30;
+		motor[lift] = -15;
 		wait1Msec(500);
 	}
 }

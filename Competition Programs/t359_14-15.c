@@ -47,11 +47,13 @@ task main()
 			servo[dragger] = DRAGGER_UP;
 		if(toggleJ1B(6, true))
 			servo[dragger] = DRAGGER_DOWN;
-		if(toggleJ2B(5, true))
+		if(toggleJ2B(2, true))
 			servo[scorer] = SCORER_CLOSE;
-		if(toggleJ2B(6, true))
-			servo[scorer] = SCORER_OPEN;
-		if(toggleJ2B(2, true)){
+		if(toggleJ2B(3, true))
+			servo[scorer] = SCORER_OPEN_RG;
+		if(toggleJ2B(4, true))
+			servo[scorer] = SCORER_OPEN_CG;
+		if(toggleJ2B(1, true)){
 			bounce = !bounce;
 			if(bounce)
 				startTask(bounceLift);
