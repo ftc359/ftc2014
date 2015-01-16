@@ -61,4 +61,4 @@ These are reusable functions that you can utilize in your programs. To see how t
 * MHTS (Titan Robotics) because I ripped off their UI style xD
 
 ##License
-All programs withing this repository are free of charge, available under the [GNU General Public License v3.0](http://www.gnu.org/licenses/gpl.html).
+All programs within this repository are free of charge, available under the [GNU General Public License v3.0](http://www.gnu.org/licenses/gpl.html).

@@ -10,7 +10,7 @@ void initializeRobot();
 #define THRESHOLD			10
 
 const ubyte DRAGGER_UP = 0;
-const ubyte DRAGGER_DOWN = 255;
+const ubyte DRAGGER_DOWN = 100;
 
 const ubyte SCORER_OPEN_CG = 180;
 const ubyte SCORER_OPEN_RG = 65;
