@@ -56,6 +56,9 @@ These are reusable functions that you can utilize in your programs. To see how t
     * Used specifically for our robot
     * Not recommended for you to use unless you want to build an exact replica of our robot
 
+##Notes
+Xander's Drivers may not be up to date in this repository. To find the latest version of his driver suite, please follow this [link](https://github.com/botbench/robotcdriversuite).
+
 ##Credits
 * Xander Soldaat for his invaluable libraries and his help in debugging HTC.h and Autnomous_Funcs.h.
 * MHTS (Titan Robotics) because I ripped off their UI style xD
