@@ -38,7 +38,10 @@
  */
 
 #pragma systemFile
+
+#ifndef __HTSMUX_H__
 #include "hitechnic-sensormux.h"
+#endif
 
 #ifndef __COMMON_H__
 #include "common.h"

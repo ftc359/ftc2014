@@ -57,9 +57,19 @@ void move(int power, long time, tDirection dir);
 void moveEnc(int power, long distance, tDirection dir);
 void moveEncSingle(tMotor mtr, int power, long distance);
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
+#ifdef __HTGYRO_H__
+float heading = 0.0;
+bool gyro_waiting;
+void fwd_PID(int power, long time);
+void fwdEnc_PID(int power, long distance);
+void bwd_PID(int power, long time);
+void bwdEnc_PID(int power, long distance);
+void turn_gyro(int power, float angle);
+task gyroGetHeading();
+#endif
 
 void configLine(char* str);
-void configLine(char* desc, sbyte *ptr, char* units, sbyte lowerLimit, sbyte increment, sbyte upperLimit);
+void configLine(char* desc, byte *ptr, char* units, byte lowerLimit, byte increment, byte upperLimit);
 void configLine(char* desc, short *ptr, char* units, short lowerLimit, short increment, short upperLimit);
 void configLine(char* desc, long *ptr, char* units, long lowerLimit, long increment, long upperLimit);	//Why no int? Byte size of int = long
 void configLine(char* desc, bool *ptr, char* units, char* valTrue, char* valFalse);
@@ -138,15 +148,256 @@ int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime){
 	return ((startSpeed-stopSpeed)/pow(maxTime,2))*pow(currentTime-maxTime,2)+stopSpeed;
 }
 
+#ifdef __HTGYRO_H__
+task gyroGetHeading(){
+	displayString(5, "Callibrated");
+	while(true){
+		readSensor(&gyro);
+		hogCPU();
+		heading += (gyro.rotation * 0.001);
+		if(heading < 0.0)
+			heading += 360.0;
+		if(heading >= 360.0)
+			heading -= 360.0;
+		gyro_waiting = true;
+		releaseCPU();
+		wait1Msec(1);
+		gyro_waiting = false;
+	}
+}
+
+void fwd_PID(int power, long time){
+	float prefHeading = 0.0;
+	const float error_margin = 1.0;
+	float error = 0.0;
+	int correction_left = LEFT_OFFSET;
+	int correction_right = RIGHT_OFFSET;
+	long error_start = 0;
+	long timeOffset = 0;
+	//while(gyro_waiting == true){}
+	prefHeading = heading;
+	timeOffset = nPgmTime;
+	while(nPgmTime - timeOffset <= time){
+		error = prefHeading - heading;
+ 	 	nxtDisplayTextLine(0, "%d", error);
+		if(abs(error) > 10.0 /*BIG error - hit by something*/){
+			error_start = nPgmTime;
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+			while(heading != prefHeading){
+				motor[DRIVEL] = power * (error > 0.0)?-1:1;
+	 	 		motor[DRIVER] = power * (error < 0.0)?1:-1;
+ 	 	nxtDisplayTextLine(4, "M1: %d", power * (error > 0.0)?-1:1);
+ 	 	nxtDisplayTextLine(5, "M2: %d", power * (error < 0.0)?1:-1);
+	 	 	}
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+	 	 	timeOffset -= (nPgmTime - error_start);
+	 	}else if(abs(error) > error_margin){
+	 		if(error > 0.0){
+	 			if(correction_left >= 100)
+	 				correction_right--;
+	 			else
+	 				correction_left++;
+	 		}
+	 		if(error < 0.0){
+	 			if(correction_right >= 100)
+	 				correction_left--;
+	 			else
+	 				correction_right++;
+	 		}
+		}
+		motor[DRIVEL] = power + correction_left;
+ 	 	motor[DRIVER] = power + correction_right;
+ 	 	nxtDisplayTextLine(4, "M1: %d", power + correction_left);
+ 	 	nxtDisplayTextLine(5, "M2: %d", power + correction_right);
+ 	 	nxtDisplayTextLine(6, "%d", nPgmTime - timeOffset);
+ 	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+}
+
+void fwdEnc_PID(int power, long distance){
+	float prefHeading = 0.0;
+	const float error_margin = 1.0;
+	float error = 0.0;
+	float netError = 0.0;
+	int correction_left = LEFT_OFFSET;
+	int correction_right = RIGHT_OFFSET;
+	long nPrev[2];
+	while(gyro_waiting == true){}
+	prefHeading = heading;
+	while(nPrev[(netError > 0.0)?0:1] <= distance){
+		nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVEL]);
+		nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVER]);
+		error = prefHeading - heading;
+		netError += error;
+		if(abs(error) > 10.0 /*BIG error - hit by something*/){
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+			while(heading != prefHeading){
+				motor[DRIVEL] = power * (error > 0.0)?-1:1;
+	 	 		motor[DRIVER] = power * (error < 0.0)?1:-1;
+	 	 	}
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+	 	}else if(abs(error) > error_margin){
+	 		if(error > 0.0){
+	 			if(correction_left >= 100)
+	 				correction_right--;
+	 			else
+	 				correction_left++;
+	 		}
+	 		if(error < 0.0){
+	 			if(correction_right >= 100)
+	 				correction_left--;
+	 			else
+	 				correction_right++;
+	 		}
+		}else{
+	 		correction_left = 0;
+	 		correction_right = 0;
+	 	}
+		motor[DRIVEL] = power + correction_left;
+ 	 	motor[DRIVER] = power + correction_right;
+ 	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+}
+
+void bwd_PID(int power, long time){
+	float prefHeading = 0.0;
+	const float error_margin = 1.0;
+	float error = 0.0;
+	int correction_left = LEFT_OFFSET;
+	int correction_right = RIGHT_OFFSET;
+	long error_start = 0;
+	long timeOffset = 0;
+	while(gyro_waiting == true){}
+	prefHeading = heading;
+	timeOffset = nPgmTime;
+	while(nPgmTime - timeOffset <= time){
+		error = prefHeading - heading;
+		if(abs(error) > 10.0 /*BIG error - hit by something*/){
+			error_start = nPgmTime;
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+			while(heading != prefHeading){
+				motor[DRIVEL] = -power * (error > 0.0)?-1:1;
+	 	 		motor[DRIVER] = -power * (error < 0.0)?1:-1;
+	 	 	}
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+	 	 	timeOffset -= (nPgmTime - error_start);
+	 	}else if(abs(error) > error_margin){
+	 		if(error > 0.0){
+	 			if(correction_left <= -100)
+	 				correction_right++;
+	 			else
+	 				correction_left--;
+	 		}
+	 		if(error < 0.0){
+	 			if(correction_right <= -100)
+	 				correction_left++;
+	 			else
+	 				correction_right--;
+	 		}
+		}
+		motor[DRIVEL] = -power + correction_left;
+ 	 	motor[DRIVER] = -power + correction_right;
+ 	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+}
+
+void bwdEnc_PID(int power, long distance){
+	float prefHeading = 0.0;
+	const float error_margin = 1.0;
+	float error = 0.0;
+	float netError = 0.0;
+	int correction_left = LEFT_OFFSET;
+	int correction_right = RIGHT_OFFSET;
+	long nPrev[2];
+	while(gyro_waiting == true){}
+	prefHeading = heading;
+	while(nPrev[(netError > 0.0)?0:1] <= distance){
+		nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVEL]);
+		nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVER]);
+		error = prefHeading - heading;
+		netError += error;
+		if(abs(error) > 10.0 /*BIG error - hit by something*/){
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+			while(heading != prefHeading){
+				motor[DRIVEL] = -power * (error > 0.0)?-1:1;
+	 	 		motor[DRIVER] = -power * (error < 0.0)?1:-1;
+	 	 	}
+			motor[DRIVEL] = 0;
+			motor[DRIVER] = 0;
+			wait1Msec(100);
+	 	}else if(abs(error) > error_margin){
+	 		if(error > 0.0){
+	 			if(correction_left <= -100)
+	 				correction_right++;
+	 			else
+	 				correction_left--;
+	 		}
+	 		if(error < 0.0){
+	 			if(correction_right <= -100)
+	 				correction_left++;
+	 			else
+	 				correction_right--;
+	 		}
+		}else{
+	 		correction_left = 0;
+	 		correction_right = 0;
+	 	}
+		motor[DRIVEL] = -power + correction_left;
+ 	 	motor[DRIVER] = -power + correction_right;
+ 	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+}
+
+void turn_gyro(int power, float angle){
+	float prefHeading = 0.0;
+	const float error_margin = 0;
+	while(gyro_waiting == true){}
+	prefHeading = heading + angle;
+	if(prefHeading < 0.0)
+		prefHeading += 360.0;
+	if(prefHeading >= 360.0)
+		prefHeading -= 360.0;
+	while(!(prefHeading - heading <= error_margin && prefHeading - heading >= -error_margin)){
+		motor[DRIVEL] = power * (prefHeading - heading)?1:-1;
+		motor[DRIVER] = power * (prefHeading - heading)?-1:1;
+	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+}
+#endif //__GYRO_H__
+
 void configLine(char* str){
     nxtDisplayLines[iLine].config = CONFIG_CONSTANT;
     nxtDisplayLines[iLine++].desc = str;
 }
-void configLine(char* desc, sbyte *ptr, char* units, sbyte lowerLimit, sbyte increment, sbyte upperLimit){
+void configLine(char* desc, byte *ptr, char* units, byte lowerLimit, byte increment, byte upperLimit){
     nxtDisplayLines[iLine].config = CONFIG_BYTE;
     nxtDisplayLines[iLine].desc = desc;
     nxtDisplayLines[iLine].units = units;
-    nxtDisplayLines[iLine].ptr = (void*)(sbyte*)ptr;
+    nxtDisplayLines[iLine].ptr = (void*)(byte*)ptr;
     nxtDisplayLines[iLine].lowerLimit = lowerLimit;
     nxtDisplayLines[iLine].increment = increment;
     nxtDisplayLines[iLine++].upperLimit = upperLimit;
@@ -260,7 +511,7 @@ void startDisplay(bool onPress, bool savePrefs){
 		          case CONFIG_CONSTANT:
 			          break;
 		         case CONFIG_BYTE:
-			          ReadByte(hFileHandle, nIoResult, *(sbyte*)nxtDisplayLines[index].ptr);
+			          ReadByte(hFileHandle, nIoResult, *(byte*)nxtDisplayLines[index].ptr);
 			          break;
 		          case CONFIG_SHORT:
 			          ReadShort(hFileHandle, nIoResult, *(short*)nxtDisplayLines[index].ptr);
@@ -288,7 +539,7 @@ void startDisplay(bool onPress, bool savePrefs){
                 displayString(index, "%s", nxtDisplayLines[index].desc);
                 break;
             case CONFIG_BYTE:
-                displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(byte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                 break;
             case CONFIG_SHORT:
                 displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
@@ -326,7 +577,7 @@ void startDisplay(bool onPress, bool savePrefs){
                     displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
                     break;
                 case CONFIG_BYTE:
-                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
                 case CONFIG_SHORT:
                     displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -362,7 +613,7 @@ void startDisplay(bool onPress, bool savePrefs){
                             displayString(index, "%s", nxtDisplayLines[index].desc);
                             break;
                         case CONFIG_BYTE:
-                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(byte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                             break;
                         case CONFIG_SHORT:
                             displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
@@ -391,7 +642,7 @@ void startDisplay(bool onPress, bool savePrefs){
 	                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
 	                    break;
 	                case CONFIG_BYTE:
-	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
 	                    break;
 	                case CONFIG_SHORT:
 	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -436,9 +687,9 @@ void startDisplay(bool onPress, bool savePrefs){
                 while(nNxtButtonPressed == 1){
                     switch(nxtDisplayLines[iCurrentLine].config){
                         case CONFIG_BYTE:
-                            *(sbyte*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
-                            if(*(sbyte*)nxtDisplayLines[iCurrentLine].ptr > nxtDisplayLines[iCurrentLine].upperLimit)
-                                *(sbyte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].upperLimit;
+                            *(byte*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
+                            if(*(byte*)nxtDisplayLines[iCurrentLine].ptr > nxtDisplayLines[iCurrentLine].upperLimit)
+                                *(byte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].upperLimit;
                             break;
                         case CONFIG_SHORT:
                             *(short*)nxtDisplayLines[iCurrentLine].ptr += nxtDisplayLines[iCurrentLine].increment;
@@ -469,7 +720,7 @@ void startDisplay(bool onPress, bool savePrefs){
 				                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
 				                    break;
 				                case CONFIG_BYTE:
-				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
 				                    break;
 				                case CONFIG_SHORT:
 				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -507,9 +758,9 @@ void startDisplay(bool onPress, bool savePrefs){
                 while(nNxtButtonPressed == 2){
                     switch(nxtDisplayLines[iCurrentLine].config){
                         case CONFIG_BYTE:
-                            *(sbyte*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
-                            if(*(sbyte*)nxtDisplayLines[iCurrentLine].ptr < nxtDisplayLines[iCurrentLine].lowerLimit)
-                                *(sbyte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].lowerLimit;
+                            *(byte*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
+                            if(*(byte*)nxtDisplayLines[iCurrentLine].ptr < nxtDisplayLines[iCurrentLine].lowerLimit)
+                                *(byte*)nxtDisplayLines[iCurrentLine].ptr = nxtDisplayLines[iCurrentLine].lowerLimit;
                             break;
                         case CONFIG_SHORT:
                             *(short*)nxtDisplayLines[iCurrentLine].ptr -= nxtDisplayLines[iCurrentLine].increment;
@@ -540,7 +791,7 @@ void startDisplay(bool onPress, bool savePrefs){
 				                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
 				                    break;
 				                case CONFIG_BYTE:
-				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
 				                    break;
 				                case CONFIG_SHORT:
 				                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -573,7 +824,7 @@ void startDisplay(bool onPress, bool savePrefs){
                     displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
                     break;
                 case CONFIG_BYTE:
-                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
                     break;
                 case CONFIG_SHORT:
                     displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -608,7 +859,7 @@ void startDisplay(bool onPress, bool savePrefs){
                             displayString(index, "%s", nxtDisplayLines[index].desc);
                             break;
                         case CONFIG_BYTE:
-                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(sbyte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
+                            displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(byte*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
                             break;
                         case CONFIG_SHORT:
                             displayString(index, "%s%d%s", nxtDisplayLines[index].desc, *(short*)nxtDisplayLines[index].ptr, nxtDisplayLines[index].units);
@@ -637,7 +888,7 @@ void startDisplay(bool onPress, bool savePrefs){
 	                    displayString(iCurrentLine-iOffset, "%s", nxtDisplayLines[iCurrentLine].desc);
 	                    break;
 	                case CONFIG_BYTE:
-	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(sbyte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
+	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(byte*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
 	                    break;
 	                case CONFIG_SHORT:
 	                    displayString(iCurrentLine-iOffset, "%s%d%s", nxtDisplayLines[iCurrentLine].desc, *(short*)nxtDisplayLines[iCurrentLine].ptr, nxtDisplayLines[iCurrentLine].units);
@@ -660,11 +911,34 @@ void startDisplay(bool onPress, bool savePrefs){
         				invertLine(0, ((7-iCurrentLine)*8)+index, 99, ((7-iCurrentLine)*8)+index);
 	          }
             if(onPress)
-                while(nNxtButtonPressed == 3 && time1[T1] <= 500){}
+                while(nNxtButtonPressed == 3 && time1[T1] <= 1000){}
 
             if(time1[T1] > 1000){ //Hold down the enter button for more than a second and release to exit
 					    if(savePrefs){
 				    		Delete(kConfigFileName, nIoResult);
+				    		nFileSize = 0;
+				    		for(int index = 0; index <= iNumLines; index++){
+				        	switch(nxtDisplayLines[index].config) {
+				     	     case CONFIG_UNSET:
+				   		       break;
+					          case CONFIG_CONSTANT:
+						          break;
+					         case CONFIG_BYTE:
+						          nFileSize += 1;
+						          break;
+					          case CONFIG_SHORT:
+						          nFileSize += 2;
+						          break;
+			  	          case CONFIG_LONG:
+						          nFileSize += 4;
+						          break;
+		     				    case CONFIG_BOOL:
+		      				   	nFileSize += 1;
+		  				       	break;
+					          default:
+				 		          break;
+				      	  	}
+					      }
 				        OpenWrite(hFileHandle, nIoResult, kConfigFileName, nFileSize);
 				        if(nIoResult == ioRsltSuccess){
 					        for(int index = 0; index <= iNumLines; index++){
@@ -674,7 +948,7 @@ void startDisplay(bool onPress, bool savePrefs){
 						          case CONFIG_CONSTANT:
 							          break;
 						         case CONFIG_BYTE:
-							          WriteByte(hFileHandle, nIoResult, *(sbyte*)nxtDisplayLines[index].ptr);
+							          WriteByte(hFileHandle, nIoResult, *(byte*)nxtDisplayLines[index].ptr);
 							          break;
 						          case CONFIG_SHORT:
 							          WriteShort(hFileHandle, nIoResult, *(short*)nxtDisplayLines[index].ptr);
