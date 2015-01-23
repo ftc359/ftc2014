@@ -59,7 +59,6 @@ void moveEncSingle(tMotor mtr, int power, long distance);
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
 #ifdef __HTGYRO_H__
 float heading = 0.0;
-bool gyro_waiting;
 void fwd_PID(int power, long time);
 void fwdEnc_PID(int power, long distance);
 void bwd_PID(int power, long time);
@@ -155,65 +154,50 @@ task gyroGetHeading(){
 		readSensor(&gyro);
 		hogCPU();
 		heading += (gyro.rotation * 0.001);
-		if(heading < 0.0)
-			heading += 360.0;
-		if(heading >= 360.0)
-			heading -= 360.0;
-		gyro_waiting = true;
 		releaseCPU();
 		wait1Msec(1);
-		gyro_waiting = false;
 	}
 }
 
 void fwd_PID(int power, long time){
-	float prefHeading = 0.0;
-	const float error_margin = 1.0;
+	float prefHeading = heading;
+	const float error_margin = 2.0;
 	float error = 0.0;
-	int correction_left = LEFT_OFFSET;
-	int correction_right = RIGHT_OFFSET;
+	int correction_left = 0;
+	int correction_right = 0;
 	long error_start = 0;
-	long timeOffset = 0;
-	//while(gyro_waiting == true){}
-	prefHeading = heading;
-	timeOffset = nPgmTime;
-	while(nPgmTime - timeOffset <= time){
+	long timeOffset = nPgmTime;
+	while(nPgmTime - timeOffset < time){
 		error = prefHeading - heading;
- 	 	nxtDisplayTextLine(0, "%d", error);
 		if(abs(error) > 10.0 /*BIG error - hit by something*/){
 			error_start = nPgmTime;
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-			while(heading != prefHeading){
-				motor[DRIVEL] = power * (error > 0.0)?-1:1;
-	 	 		motor[DRIVER] = power * (error < 0.0)?1:-1;
- 	 	nxtDisplayTextLine(4, "M1: %d", power * (error > 0.0)?-1:1);
- 	 	nxtDisplayTextLine(5, "M2: %d", power * (error < 0.0)?1:-1);
+			while(!(heading <= prefHeading + error_margin && heading >= prefHeading - error_margin)){
+				motor[DRIVEL] = (power - LEFT_OFFSET) * ((error > 0.0)?-1:1);
+	 	 		motor[DRIVER] = (power - RIGHT_OFFSET) * ((error < 0.0)?1:-1);
 	 	 	}
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-	 	 	timeOffset -= (nPgmTime - error_start);
+	 	 	timeOffset += (nPgmTime - error_start);
 	 	}else if(abs(error) > error_margin){
 	 		if(error > 0.0){
-	 			if(correction_left >= 100)
-	 				correction_right--;
+	 			if(abs(power-correction_right) > abs(power - correction_left))
+	 				correction_right = 0;
 	 			else
-	 				correction_left++;
+	 				correction_left = abs(error) * (power - LEFT_OFFSET) * 0.005;
 	 		}
 	 		if(error < 0.0){
-	 			if(correction_right >= 100)
-	 				correction_left--;
+	 			if(abs(power-correction_left) > abs(power - correction_right))
+	 				correction_left = 0;
 	 			else
-	 				correction_right++;
+	 				correction_right = abs(error) * (power - RIGHT_OFFSET) * 0.005;
 	 		}
 		}
-		motor[DRIVEL] = power + correction_left;
- 	 	motor[DRIVER] = power + correction_right;
- 	 	nxtDisplayTextLine(4, "M1: %d", power + correction_left);
- 	 	nxtDisplayTextLine(5, "M2: %d", power + correction_right);
- 	 	nxtDisplayTextLine(6, "%d", nPgmTime - timeOffset);
+		motor[DRIVEL] = power + correction_left - LEFT_OFFSET;
+ 	 	motor[DRIVER] = power + correction_right - RIGHT_OFFSET;
  	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
@@ -221,15 +205,13 @@ void fwd_PID(int power, long time){
 }
 
 void fwdEnc_PID(int power, long distance){
-	float prefHeading = 0.0;
-	const float error_margin = 1.0;
+	float prefHeading = heading;
+	const float error_margin = 2.0;
 	float error = 0.0;
 	float netError = 0.0;
-	int correction_left = LEFT_OFFSET;
-	int correction_right = RIGHT_OFFSET;
+	int correction_left = 0;
+	int correction_right = 0;
 	long nPrev[2];
-	while(gyro_waiting == true){}
-	prefHeading = heading;
 	while(nPrev[(netError > 0.0)?0:1] <= distance){
 		nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVEL]);
 		nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVER]);
@@ -239,32 +221,29 @@ void fwdEnc_PID(int power, long distance){
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-			while(heading != prefHeading){
-				motor[DRIVEL] = power * (error > 0.0)?-1:1;
-	 	 		motor[DRIVER] = power * (error < 0.0)?1:-1;
+			while(!(heading <= prefHeading + error_margin && heading >= prefHeading - error_margin)){
+				motor[DRIVEL] = (power - LEFT_OFFSET) * ((error > 0.0)?-1:1);
+	 	 		motor[DRIVER] = (power - RIGHT_OFFSET) * ((error < 0.0)?1:-1);
 	 	 	}
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
 	 	}else if(abs(error) > error_margin){
 	 		if(error > 0.0){
-	 			if(correction_left >= 100)
-	 				correction_right--;
+	 			if(abs(power-correction_right) > abs(power - correction_left))
+	 				correction_right = 0;
 	 			else
-	 				correction_left++;
+	 				correction_left = abs(error) * (power - LEFT_OFFSET) * 0.005;
 	 		}
 	 		if(error < 0.0){
-	 			if(correction_right >= 100)
-	 				correction_left--;
+	 			if(abs(power-correction_left) > abs(power - correction_right))
+	 				correction_left = 0;
 	 			else
-	 				correction_right++;
+	 				correction_right = abs(error) * (power - RIGHT_OFFSET) * 0.005;
 	 		}
-		}else{
-	 		correction_left = 0;
-	 		correction_right = 0;
-	 	}
-		motor[DRIVEL] = power + correction_left;
- 	 	motor[DRIVER] = power + correction_right;
+		}
+		motor[DRIVEL] = power + correction_left - LEFT_OFFSET;
+ 	 	motor[DRIVER] = power + correction_right - RIGHT_OFFSET;
  	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
@@ -272,16 +251,14 @@ void fwdEnc_PID(int power, long distance){
 }
 
 void bwd_PID(int power, long time){
-	float prefHeading = 0.0;
-	const float error_margin = 1.0;
+	float prefHeading = heading;
+	const float error_margin = 2.0;
 	float error = 0.0;
-	int correction_left = LEFT_OFFSET;
-	int correction_right = RIGHT_OFFSET;
+	int correction_left = 0;
+	int correction_right = 0;
 	long error_start = 0;
-	long timeOffset = 0;
-	while(gyro_waiting == true){}
-	prefHeading = heading;
-	timeOffset = nPgmTime;
+	long timeOffset = nPgmTime;
+	power = -power;
 	while(nPgmTime - timeOffset <= time){
 		error = prefHeading - heading;
 		if(abs(error) > 10.0 /*BIG error - hit by something*/){
@@ -289,30 +266,30 @@ void bwd_PID(int power, long time){
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-			while(heading != prefHeading){
-				motor[DRIVEL] = -power * (error > 0.0)?-1:1;
-	 	 		motor[DRIVER] = -power * (error < 0.0)?1:-1;
+			while(!(heading <= prefHeading + error_margin && heading >= prefHeading - error_margin)){
+				motor[DRIVEL] = (power - LEFT_OFFSET) * ((error > 0.0)?-1:1);
+	 	 		motor[DRIVER] = (power - RIGHT_OFFSET) * ((error < 0.0)?1:-1);
 	 	 	}
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-	 	 	timeOffset -= (nPgmTime - error_start);
+	 	 	timeOffset += (nPgmTime - error_start);
 	 	}else if(abs(error) > error_margin){
 	 		if(error > 0.0){
-	 			if(correction_left <= -100)
-	 				correction_right++;
+	 			if(abs(power-correction_right) > abs(power - correction_left))
+	 				correction_right = 0;
 	 			else
-	 				correction_left--;
+	 				correction_left = abs(error) * (power - LEFT_OFFSET) * 0.005;
 	 		}
 	 		if(error < 0.0){
-	 			if(correction_right <= -100)
-	 				correction_left++;
+	 			if(abs(power-correction_left) > abs(power - correction_right))
+	 				correction_left = 0;
 	 			else
-	 				correction_right--;
+	 				correction_right = abs(error) * (power - RIGHT_OFFSET) * 0.005;
 	 		}
 		}
-		motor[DRIVEL] = -power + correction_left;
- 	 	motor[DRIVER] = -power + correction_right;
+		motor[DRIVEL] = power - correction_left - LEFT_OFFSET;
+ 	 	motor[DRIVER] = power - correction_right - RIGHT_OFFSET;
  	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
@@ -320,15 +297,14 @@ void bwd_PID(int power, long time){
 }
 
 void bwdEnc_PID(int power, long distance){
-	float prefHeading = 0.0;
-	const float error_margin = 1.0;
+	float prefHeading = heading;
+	const float error_margin = 2.0;
 	float error = 0.0;
 	float netError = 0.0;
-	int correction_left = LEFT_OFFSET;
-	int correction_right = RIGHT_OFFSET;
+	int correction_left = 0;
+	int correction_right = 0;
 	long nPrev[2];
-	while(gyro_waiting == true){}
-	prefHeading = heading;
+	power = -power;
 	while(nPrev[(netError > 0.0)?0:1] <= distance){
 		nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVEL]);
 		nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVER]);
@@ -338,32 +314,29 @@ void bwdEnc_PID(int power, long distance){
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
-			while(heading != prefHeading){
-				motor[DRIVEL] = -power * (error > 0.0)?-1:1;
-	 	 		motor[DRIVER] = -power * (error < 0.0)?1:-1;
+			while(!(heading <= prefHeading + error_margin && heading >= prefHeading - error_margin)){
+				motor[DRIVEL] = (power - LEFT_OFFSET) * ((error > 0.0)?-1:1);
+	 	 		motor[DRIVER] = (power - RIGHT_OFFSET) * ((error < 0.0)?1:-1);
 	 	 	}
 			motor[DRIVEL] = 0;
 			motor[DRIVER] = 0;
 			wait1Msec(100);
 	 	}else if(abs(error) > error_margin){
 	 		if(error > 0.0){
-	 			if(correction_left <= -100)
-	 				correction_right++;
+	 			if(abs(power-correction_right) > abs(power - correction_left))
+	 				correction_right = 0;
 	 			else
-	 				correction_left--;
+	 				correction_left = abs(error) * (power - LEFT_OFFSET) * 0.005;
 	 		}
 	 		if(error < 0.0){
-	 			if(correction_right <= -100)
-	 				correction_left++;
+	 			if(abs(power-correction_left) > abs(power - correction_right))
+	 				correction_left = 0;
 	 			else
-	 				correction_right--;
+	 				correction_right = abs(error) * (power - RIGHT_OFFSET) * 0.005;
 	 		}
-		}else{
-	 		correction_left = 0;
-	 		correction_right = 0;
-	 	}
-		motor[DRIVEL] = -power + correction_left;
- 	 	motor[DRIVER] = -power + correction_right;
+		}
+		motor[DRIVEL] = power - correction_left - LEFT_OFFSET;
+ 	 	motor[DRIVER] = power - correction_right - RIGHT_OFFSET;
  	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
@@ -372,16 +345,11 @@ void bwdEnc_PID(int power, long distance){
 
 void turn_gyro(int power, float angle){
 	float prefHeading = 0.0;
-	const float error_margin = 0;
-	while(gyro_waiting == true){}
+	const float error_margin = 1.0;
 	prefHeading = heading + angle;
-	if(prefHeading < 0.0)
-		prefHeading += 360.0;
-	if(prefHeading >= 360.0)
-		prefHeading -= 360.0;
-	while(!(prefHeading - heading <= error_margin && prefHeading - heading >= -error_margin)){
-		motor[DRIVEL] = power * (prefHeading - heading)?1:-1;
-		motor[DRIVER] = power * (prefHeading - heading)?-1:1;
+	while(!(heading <= prefHeading + error_margin && heading >= prefHeading - error_margin)){
+		motor[DRIVEL] = (power - LEFT_OFFSET) * sgn(prefHeading - heading);
+		motor[DRIVER] = (power - RIGHT_OFFSET) *sgn(prefHeading - heading) * -1;
 	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
