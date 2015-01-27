@@ -30,8 +30,8 @@ void readIR();
 #define DRIVEL				leftWheel
 #define THRESHOLD			10
 
-const ubyte DRAGGER_UP = 85;
-const ubyte DRAGGER_DOWN = 100;
+const ubyte DRAGGER_UP = 180;
+const ubyte DRAGGER_DOWN = 150;
 
 const ubyte SCORER_OPEN_CG = 180;
 const ubyte SCORER_OPEN_RG = 65;
