@@ -18,160 +18,98 @@
 #include "Assets\Headers\h359_14-15.h"
 #include "Assets\Headers\Autonomous_Funcs.h"
 
-long waitDuration;
-long intercept;
+#define HTSMUX_SENSORTYPE   0x10
 
-bool ramp = true;
-bool fill;
-bool kickstand = false;
+long waitDuration = 0;
+long intercept = 0;
+
+int RG1 = 0;
+int RG2 = 2;
+
+bool CG = true;
+bool fill1;
+bool ramp = false;
 bool fill2;
-bool centerScore = false;
+bool KS = true;
+
+long KSwait = 0;
 
 int centerRotation; //1 = kickstand facing alliance PZ, 2 = 45, 3 = 90
 
-task timer(){
-	wait10Msec(3000);
-	playSound(soundBeepBeep);
-	wait1Msec(1000);
-	stopAllTasks();
+bool HTSMUXVerifyType(tSensors link){
+    memset(HTSMUX_I2CRequest, 0, sizeof(tByteArray));
+    HTSMUX_I2CRequest[0] = 2;
+    HTSMUX_I2CRequest[1] = HTSMUX_I2C_ADDR;
+    HTSMUX_I2CRequest[2] = HTSMUX_SENSORTYPE;
+
+    if(!writeI2C(link, HTSMUX_I2CRequest, HTSMUX_I2CReply, 8))
+        return false;
+
+    if((char)HTSMUX_I2CReply[0] == 'S' && (char)HTSMUX_I2CReply[1] == 'e' &&
+       (char)HTSMUX_I2CReply[2] == 'n' && (char)HTSMUX_I2CReply[3] == 's' &&
+       (char)HTSMUX_I2CReply[4] == 'r' && (char)HTSMUX_I2CReply[5] == 'M' &&
+       (char)HTSMUX_I2CReply[6] == 'U' && (char)HTSMUX_I2CReply[7] == 'X')
+
+        return true;
+
+    return false;
+}
+
+void selectStrategy();
+
+task debug(){
+	bool ruhroh = false;
+	if (HTSMUXVerifyType(_SMUX) == false){
+		nxtDisplayTextLine(0, "SMUX not connected");
+		ruhroh = true;
+	}
+	if(HTSMUXreadPowerStatus(_SMUX)){
+		nxtDisplayTextLine(1, "SMUX low batt");
+		ruhroh = true;
+	}
+	if(ruhroh)
+		playSound(soundBeepBeep);
+	while(true){
+		nxtDisplayTextLine(7, "H: %3.1f", heading);
+		nxtDisplayTextLine(6, "D: %3.1f", deadband);
+	}
 }
 
 task main()
 {
 	configLine("Select Options: ");
-	configLine("Intercept: ", &intercept, "ms", 0, 50, 5000);
-	configLine("Wait: ", &waitDuration, "ms", 0, 50, 10000);
-	configLine("", &ramp, "", "Ramp", "Parking Zone");
-	configLine("KS: ", &kickstand, "", "Yes", "No");
-	configLine("Score in: ", &centerScore, "", "CG", "RG");
-	startDisplay(true, true);
+	configLine("Intercept: ", &intercept, "ms", 0, 100, 7500);
+	configLine("Wait: ", &waitDuration, "ms", 0, 100, 10000);
+	configLine("RG1: ", &RG1, "cm", 0, 30, 90);
+	configLine("RG2: ", &RG2, "cm", 0, 30, 90);
+	configLine("", &ramp, "", "Ramp", "PZ");
+	configLine("", &CG, "", "CG", "RG");
+	configLine("KS: ", &KS, "", "Yes", "No");
+	configLine("KS wait: ", &KSwait, "", 0, 100, 5000);
+	startDisplay(true, true, "a359.txt");
 	initializeRobot();
+	servo[dragger] = DRAGGER_UP;
+	servo[scorer] = SCORER_CLOSE;
+	bSystemLeaveServosEnabledOnProgramStop = true;
+	stopTask(displayDiagnostics);
+	wait1Msec(1);
+	eraseDisplay();
+	calibrateGyro(&gyro, 100);
+	startTask(gyroGetHeading);
+	startTask(debug);
 	waitForStart();
-	//stopTask(readMsgFromPC);
-	//startTask(timer);
+	stopTask(readMsgFromPC);
 	wait1Msec(waitDuration);
 	if(intercept){
 		move(100, intercept, fwd);
 		return;
 	}
+	selectStrategy();
+}
+
+void selectStrategy(){
 	if(ramp){
-		move(35, 1250, bwd); //drive off ramp
-		readIR();
-		moveLift(75, 2750);
-		move(35, 2250, bwd); //drive towards goals
-		readIR();
-		wait1Msec(750);
-		servo[scorer] = SCORER_OPEN_AUTO;
-		wait1Msec(750);
-		servo[scorer] = SCORER_CLOSE;
-		centerRotation = ((ir_front_dir[0] == 5 || ir_front_dir[0] == 6 || ir_front_dir == 7) &&
-		(ir_back_dir[0] == 5 || ir_back_dir[0] == 6 || ir_back_dir[0] == 7) &&
-		(ir_front_dir[1] == 3 || ir_front_dir[1] == 4 || ir_front_dir[1] == 5) &&
-		(ir_back_dir[1] == 3 || ir_back_dir[1] == 4 || ir_back_dir[1] == 5))?1:
-		((ir_front_dir[0] == 0 || ir_front_dir[0] == 7) && (ir_back_dir[0] == 0 || ir_back_dir[0] == 7) && ir_front_dir[1] == 5 && ir_back_dir[1] == 5)?2:
-		((ir_front_dir[0] == 0 || ir_front_dir[0] == 5) && (ir_back_dir[0] == 5 || ir_back_dir[0] == 6 || ir_back_dir[0] == 7) &&
-		(ir_front_dir[1] == 0 || ir_front_dir[1] == 5 || ir_front_dir[1] == 6 || ir_front_dir[1] == 7) &&
-		(ir_back_dir[1] == 0 || ir_back_dir[1] == 5 || ir_back_dir[1] == 6 || ir_back_dir[1] == 7))?3:0;
-		displayString(3, "%d", centerRotation);
-		displayString(4, "%d", ir_front_dir[0]);
-		displayString(5, "%d", ir_back_dir[0]);
-		displayString(6, "%d", ir_front_dir[1]);
-		displayString(7, "%d", ir_back_dir[1]);
-		//if(centerRotation == 0)
-			//centerScore = false;
-		if(centerScore){
-			move(30, 500, right);
-			move(35, 500, fwd);
-			move(30, 1000, right);
-			move(35, 1250, fwd);
-			move(30, 1000, left);
-			move(30, 3000, fwd);
-			move(30, 1000, right);
-			moveLift(90, 2000);
-			switch(centerRotation){
-				case 1:
-					move(35, 3000, fwd);
-					break;
-				case 2:
-					move(35, 2000, fwd);
-					break;
-				case 3:
-					move(35, 1500, fwd);
-					move(30, 900, left);
-					move(30, 1500, bwd);
-					wait1Msec(1000);
-					servo[scorer] = SCORER_OPEN_CG;
-					wait1Msec(1000);
-					servo[scorer] = SCORER_CLOSE;
-					break;
-			}
-			if(kickstand){
-				//knock down kickstand
-			}else{
-			}
-			//score in center goal and 60cm goal
-			//drag back the goal
-		}else{
-			moveLift(-20, 1500);
-			move(30, 500, right);
-			move(50, 750, fwd);
-			move(30, 750, right);
-			move(30, 1250, fwd);
-			move(30, 1000, left);
-			move(30, 2500, bwd);
-			move(30, 150, left);
-			wait1Msec(1000);
-			move(50, 150, left);
-			wait1Msec(1000);
-			servo[scorer] = SCORER_OPEN_CG;
-			wait1Msec(1000);
-			servo[scorer] = SCORER_CLOSE;
-			//score in and drag 30cm
-			if(kickstand){
-				switch(centerRotation){
-					case 1:
-						move(35, 1000, fwd);
-						move(30, 1250, left);
-						move(30, 1000, fwd);
-						move(30, 1000, right);
-						move(30, 3000, fwd);
-						move(30, 1250, right);
-						move(100, 2000, fwd);
-						break;
-					case 2:
-						move(30, 3000, fwd);
-						move(30, 900, right);
-						move(100, 2000, fwd);
-						break;
-					case 3:
-						move(30, 1000, fwd);
-						move(30, 1250, right);
-						move(30, 1000, fwd);
-						move(30, 1250, left);
-						move(100, 2000, fwd);
-						break;
-				}
-			}else{
-			}
-			//score in 90cm goal, drag back
-		}
-	}else{																				//Start in parking zone
-		//drive off ramp
-		//drive towards goals
-		if(centerScore){
-			//drag 60cm
-		}else{
-			//score in and drag 30cm
-		}
-		if(kickstand){
-			//knock down kickstand
-		}
-		if(centerScore){
-			//score in center goal and 60cm goal
-			//drag back the goal
-		}else{
-			//score in 90cm goal, drag back
-		}
+	}else{
+
 	}
-	while(true){}
 }

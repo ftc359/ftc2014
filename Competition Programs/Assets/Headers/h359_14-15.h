@@ -39,13 +39,12 @@ const ubyte SCORER_OPEN_AUTO = 200;
 const ubyte SCORER_CLOSE = 240;
 
 void initializeRobot(){
+	bFloatDuringInactiveMotorPWM = false;
 	initSensor(&ir_front, _ir_front);
 	initSensor(&ir_back, _ir_back);
 	initSensor(&gyro, _gyro);
 	servoChangeRate[dragger] = 0;
 	servoChangeRate[scorer] = 12;
-	servo[dragger] = DRAGGER_UP;
-	servo[scorer] = SCORER_CLOSE;
 }
 
 void readIR(){
@@ -79,15 +78,6 @@ void moveLift(int power, long time){
 	target_power = power;
 	target_time = time;
 	startTask(liftTask);
-}
-
-task bounceLift(){
-	while(true){
-		motor[lift] = 10;
-		wait1Msec(100);
-		motor[lift] = -5;
-		wait1Msec(100);
-	}
 }
 
 #endif //__359_14-15_H__

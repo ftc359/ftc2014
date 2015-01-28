@@ -54,17 +54,17 @@ int iLine;
 
 //Function prototypes
 void move(int power, long time, tDirection dir);
-void moveEnc(int power, unsigned long distance, tDirection dir);
-void moveEncSingle(tMotor mtr, int power, unsigned long distance, int correction);
+void moveEnc(int power, long distance, int correction, tDirection dir);
+void moveEncSingle(tMotor mtr, int power, long distance, int correction);
 int accelerate(int startSpeed, int stopSpeed, long maxTime, long currentTime);
 #ifdef __HTGYRO_H__
 float heading = 0.0;
 float deadband = 0.0;
 tHTGYROPtr gyro_ptr;
 void fwd_PID(int power, long time, float minor_error_margin, float major_error_margin, int correction);
-void fwdEnc_PID(int power, unsigned long distance, float minor_error_margin, float major_error_margin, int correction);
+void fwdEnc_PID(int power, long distance, float minor_error_margin, float major_error_margin, int correction);
 void bwd_PID(int power, long time);
-void bwdEnc_PID(int power, unsigned long distance);
+void bwdEnc_PID(int power, long distance);
 void turn_gyro(int power, float angle, float minor_error_margin);
 void calibrateGyro(tHTGYROPtr ptr, long trials);
 task gyroGetHeading();
@@ -77,7 +77,7 @@ void configLine(char* desc, long *ptr, char* units, long lowerLimit, long increm
 void configLine(char* desc, bool *ptr, char* units, char* valTrue, char* valFalse);
 //void configLine(char* desc, string *ptr, char* units, ubyte arraySize);
 //void configLine(char* desc, char *ptr, char* units, ubyte arraySize);
-void startDisplay(bool onPress, bool savePrefs);
+void startDisplay(bool onPress, bool savePrefs, char* configFileName);
 
 void move(int power, long time, tDirection dir){
 #if defined(__HOLO_H__) && defined(DRIVEFR) && defined(DRIVEFL) && defined(DRIVEBR) && defined(DRIVEBL)
@@ -91,15 +91,18 @@ void move(int power, long time, tDirection dir){
     motor[DRIVEBL] = 0;
     motor[DRIVEBR] = 0;
 #elif defined(DRIVER) && defined(DRIVEL)
-    motor[DRIVEL] = (power - LEFT_OFFSET)*((dir & 1)?-1:1);
-    motor[DRIVER] = (power - RIGHT_OFFSET)*((dir & 2)?-1:1);
+    motor[DRIVEL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
+    motor[DRIVER] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
     wait1Msec(time);
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
 #endif
+	wait1Msec(100);
 }
-void moveEnc(int power, unsigned long distance, tDirection dir){
-    unsigned long nPrev[4] = {0, 0, 0, 0};
+void moveEnc(int power, long distance, int correction, tDirection dir){
+    long nPrev[4] = {0, 0, 0, 0};
+    long error = 0;
+    distance = abs(distance);
 #if defined(__HOLO_H__) && defined(DRIVEFR) && defined(DRIVEFL) && defined(DRIVEBR) && defined(DRIVEBL)
     nMotorEncoder[DRIVEFL] = 0;
     nMotorEncoder[DRIVEFR] = 0;
@@ -120,30 +123,65 @@ void moveEnc(int power, unsigned long distance, tDirection dir){
     motor[DRIVEFR] = 0;
     motor[DRIVEBL] = 0;
     motor[DRIVEBR] = 0;
+    wait1Msec(100);
+    error = (nPrev[0] + nPrev[1] + nPrev[2] + nPrev[3])/4;
+    for(int i = 0; i < 4; i++) nPrev[i] = 0;
+    motor[DRIVEFL] = abs(correction - LEFT_OFFSET)*((dir & 1)?-1:1)*sgn(power)*-sgn(error);
+    motor[DRIVEFR] = abs(correction - RIGHT_OFFSET)*((dir & 2)?-1:1)*sgn(power)*-sgn(error);
+    motor[DRIVEBL] = abs(correction - LEFT_OFFSET)*((dir & 1)?-1:1)*sgn(power)*-sgn(error);
+    motor[DRIVEBR] = abs(correction - RIGHT_OFFSET)*((dir & 2)?-1:1)*sgn(power)*-sgn(error);
+    while(nPrev[0] < abs(error) && nPrev[1] < distance && nPrev[2] < distance && nPrev[3] < distance){
+        nPrev[0] = (abs(nMotorEncoder[DRIVEFL]) - (error + distance) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEFL]) - (error + distance);
+        nPrev[1] = (abs(nMotorEncoder[DRIVEFR]) - (error + distance) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVEFR]) - (error + distance);
+        nPrev[2] = (abs(nMotorEncoder[DRIVEBL]) - (error + distance) >= nPrev[2] +  ENC_ERRORMARGIN)?nPrev[2]:abs(nMotorEncoder[DRIVEBL]) - (error + distance);
+        nPrev[3] = (abs(nMotorEncoder[DRIVEBR]) - (error + distance) >= nPrev[3] +  ENC_ERRORMARGIN)?nPrev[3]:abs(nMotorEncoder[DRIVEBR]) - (error + distance);
+    }
+    motor[DRIVEFL] = 0;
+    motor[DRIVEFR] = 0;
+    motor[DRIVEBL] = 0;
+    motor[DRIVEBR] = 0;
 #elif defined(DRIVER) && defined(DRIVEL)
     nMotorEncoder[DRIVEL] = 0;
     nMotorEncoder[DRIVER] = 0;
     wait1Msec(300); //wait for the encoders to calibrate
-    motor[DRIVEL] = (power - LEFT_OFFSET)*(dir & 1)?-1:1;
-    motor[DRIVER] = (power - RIGHT_OFFSET)*(dir & 2)?-1:1;
+    motor[DRIVEL] = (power - LEFT_OFFSET)*((dir & 1)?-1:1);
+    motor[DRIVER] = (power - RIGHT_OFFSET)*((dir & 2)?-1:1);
     while(nPrev[0] < distance && nPrev[1] < distance){
         nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
         nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]);
     }
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
+    wait1Msec(100);
+    error = (nPrev[0] + nPrev[1])/2;
+    for(int i = 0; i < 2; i++) nPrev[i] = 0;
+    motor[DRIVEL] = abs(correction - LEFT_OFFSET)*((dir & 1)?-1:1)*sgn(power)*-sgn(error);
+    motor[DRIVER] = abs(correction - RIGHT_OFFSET)*((dir & 2)?-1:1)*sgn(power)*-sgn(error);
+    while(nPrev[0] < abs(error) && nPrev[1] < abs(error)){
+        nPrev[0] = (abs(nMotorEncoder[DRIVEL]) - (error + distance) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]) - (error + distance);
+        nPrev[1] = (abs(nMotorEncoder[DRIVER]) - (error + distance) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]) - (error + distance);
+    }
+    motor[DRIVEL] = 0;
+    motor[DRIVER] = 0;
 #endif
+	wait1Msec(100);
 }
-void moveEncSingle(tMotor mtr, int power, unsigned long distance, int correction){
-	unsigned long nPrev = 0;
+void moveEncSingle(tMotor mtr, int power, long distance, int correction){
+	long nPrev = 0;
 	long error = 0;
+	distance = abs(distance);
 	nMotorEncoder[mtr] = 0;
 	wait1Msec(300);	//wait for the encoders to calibrate
 	motor[mtr] = power;
 	while(nPrev < distance)
 		nPrev = (abs(nMotorEncoder[mtr]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[mtr]);
+	motor[mtr] = 0;
+	wait1Msec(100);
 	error = nPrev-distance;
 	nPrev = 0;
+	motor[mtr] = abs(correction) * sgn(power) * -sgn(error);
+	while(nPrev < abs(error))
+		nPrev = (abs(nMotorEncoder[mtr]) - (error + distance) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[mtr]) - (error + distance);
 	motor[mtr] = 0;
 	wait1Msec(100);
 }
@@ -183,7 +221,7 @@ void calibrateGyro(tHTGYROPtr ptr, long trials){
     wait1Msec(50);
   }
   ptr->offset = avg/trials;
-  deadband = max - min;
+  deadband = (max - min)*2;
   gyro_ptr = ptr;
 }
 
@@ -255,13 +293,13 @@ void fwd_PID(int power, long time, float minor_error_margin, float major_error_m
 	wait1Msec(100);
 }
 
-void fwdEnc_PID(int power, unsigned long distance, float minor_error_margin, float major_error_margin, int correction){
+void fwdEnc_PID(int power, long distance, float minor_error_margin, float major_error_margin, int correction){
 	float prefHeading = heading;
 	float error = 0.0;
 	float netError = 0.0;
 	int correction_left = 0;
 	int correction_right = 0;
-	unsigned long nPrev[2];
+	long nPrev[2];
 	while(nPrev[(netError > 0.0)?0:1] <= distance){
 		nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVEL]);
 		nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[DRIVER]);
@@ -298,6 +336,22 @@ void fwdEnc_PID(int power, unsigned long distance, float minor_error_margin, flo
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
 	wait1Msec(100);
+}
+
+void bwd_PID(int power, long time, float minor_error_margin, float major_error_margin, int correction){
+	bMotorReflected[DRIVEL] = !bMotorReflected[DRIVEL];
+	bMotorReflected[DRIVER] = !bMotorReflected[DRIVER];
+	fwd_PID(power, time, minor_error_margin, major_error_margin, correction);
+	bMotorReflected[DRIVEL] = !bMotorReflected[DRIVEL];
+	bMotorReflected[DRIVER] = !bMotorReflected[DRIVER];
+}
+
+void bwdEnc_PID(int power, long distance, float minor_error_margin, float major_error_margin, int correction){
+	bMotorReflected[DRIVEL] = !bMotorReflected[DRIVEL];
+	bMotorReflected[DRIVER] = !bMotorReflected[DRIVER];
+	fwdEnc_PID(power, distance, minor_error_margin, major_error_margin, correction);
+	bMotorReflected[DRIVEL] = !bMotorReflected[DRIVEL];
+	bMotorReflected[DRIVER] = !bMotorReflected[DRIVER];
 }
 
 void turn_gyro(int power, float angle, float minor_error_margin){
@@ -366,8 +420,7 @@ void configLine(char* desc, char *ptr, char* units, ubyte arraySize){
     nxtDisplayLines[iLine++].ptr = (void*)(char*)ptr;
     nxtDisplayLines[iLine++].arraySize = arraySize;
 }*/
-void startDisplay(bool onPress, bool savePrefs){
-
+void startDisplay(bool onPress, bool savePrefs, char* configFileName){
     int iNumLines = iLine;
     int iCurrentLine = 0;
     int iOffset = 0;
@@ -376,7 +429,6 @@ void startDisplay(bool onPress, bool savePrefs){
 
     TFileHandle     hFileHandle;
     TFileIOResult   nIoResult;
-    string kConfigFileName = "DisplayConfig.txt";
     short nFileSize;
     bool bDelete = false;
     byte iTemp;
@@ -425,8 +477,8 @@ void startDisplay(bool onPress, bool savePrefs){
         displayClearTextLine(3);
         displayClearTextLine(4);
         if(bDelete)
-       	 Delete(kConfigFileName, nIoResult);
-        OpenRead(hFileHandle, nIoResult, kConfigFileName, nFileSize);
+       	 Delete(configFileName, nIoResult);
+        OpenRead(hFileHandle, nIoResult, configFileName, nFileSize);
         if(nIoResult == ioRsltSuccess){
 	        for(int index = 0; index <= iNumLines; index++){
 	        	switch(nxtDisplayLines[index].config) {
@@ -839,7 +891,7 @@ void startDisplay(bool onPress, bool savePrefs){
 
             if(time1[T1] > 1000){ //Hold down the enter button for more than a second and release to exit
 					    if(savePrefs){
-				    		Delete(kConfigFileName, nIoResult);
+				    		Delete(configFileName, nIoResult);
 				    		nFileSize = 0;
 				    		for(int index = 0; index <= iNumLines; index++){
 				        	switch(nxtDisplayLines[index].config) {
@@ -863,7 +915,7 @@ void startDisplay(bool onPress, bool savePrefs){
 				 		          break;
 				      	  	}
 					      }
-				        OpenWrite(hFileHandle, nIoResult, kConfigFileName, nFileSize);
+				        OpenWrite(hFileHandle, nIoResult, configFileName, nFileSize);
 				        if(nIoResult == ioRsltSuccess){
 					        for(int index = 0; index <= iNumLines; index++){
 					        	switch(nxtDisplayLines[index].config) {

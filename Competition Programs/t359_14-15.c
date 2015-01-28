@@ -19,7 +19,6 @@
 #include "Assets\Headers\Teleop_Funcs.h"
 
 int maxDrive = 100;
-bool bounce = false;
 
 task main()
 {
@@ -36,11 +35,9 @@ task main()
 		if(abs(joystick.joy2_y1) >= THRESHOLD)
 			motor[intake] = joystickExponential(THRESHOLD, 100, joystick.joy2_y1);
 		else motor[intake] = 0;
-		if(abs(joystick.joy2_y2) >= THRESHOLD){
-			stopTask(bounceLift);
-			bounce = false;
+		if(abs(joystick.joy2_y2) >= THRESHOLD)
 			motor[lift] = joystickExponential(THRESHOLD,100,joystick.joy2_y2);
-		}else if(bounce == false)
+		else
 			motor[lift] = 0;
 		if(toggleJ1B(5, true))
 			servo[dragger] = DRAGGER_UP;
@@ -52,14 +49,5 @@ task main()
 			servo[scorer] = SCORER_OPEN_RG;
 		if(toggleJ2B(4, true))
 			servo[scorer] = SCORER_OPEN_CG;
-		if(toggleJ2B(1, true)){
-			bounce = !bounce;
-			if(bounce)
-				startTask(bounceLift);
-			else{
-				stopTask(bounceLift);
-				motor[lift] = 0;
-			}
-		}
 	}
 }
