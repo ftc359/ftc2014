@@ -10,12 +10,11 @@
 
 tHTSMUX SMUX;
 tHTIRS2 ir_front;
-#define _ir_front	msensor_S2_1
+#define _ir_front	msensor_S2_4
 tHTIRS2 ir_back;
-#define _ir_back	msensor_S2_2
+#define _ir_back	msensor_S2_3
 tHTGYRO gyro;
-#define _gyro			msensor_S2_3
-#define US				msensor_S2_4
+#define US				msensor_S2_1
 
 int ir_front_dir[2];
 long ir_front_str[2];
@@ -35,8 +34,8 @@ const ubyte DRAGGER_DOWN = 150;
 
 const ubyte SCORER_OPEN_CG = 180;
 const ubyte SCORER_OPEN_RG = 65;
-const ubyte SCORER_OPEN_AUTO = 200;
-const ubyte SCORER_CLOSE = 240;
+const ubyte SCORER_OPEN_AUTO = 225;
+const ubyte SCORER_CLOSE = 255;
 
 void initializeRobot(){
 	bFloatDuringInactiveMotorPWM = false;
@@ -63,21 +62,7 @@ void readIR(){
 }
 
 bool busy = false;
-long target_time = 0;
-int target_power= 0;
-
-task liftTask(){
-	busy = true;
-	motor[lift] = target_power;
-	wait1Msec(target_time);
-	motor[lift] = 0;
-	busy = false;
-}
-
-void moveLift(int power, long time){
-	target_power = power;
-	target_time = time;
-	startTask(liftTask);
-}
+long target_power = 0;
+int target_distance = 0;
 
 #endif //__359_14-15_H__

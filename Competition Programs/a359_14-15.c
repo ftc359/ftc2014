@@ -1,11 +1,12 @@
 #pragma config(Hubs,  S1, HTMotor,  HTServo,  HTMotor,  none)
-#pragma config(Sensor, S2,     _SMUX,          sensorI2CCustom)
-#pragma config(Sensor, S3,     light,          sensorLightInactive)
-#pragma config(Sensor, S4,     tMUX,           sensorHiTechnicTouchMux)
-#pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop, reversed)
-#pragma config(Motor,  mtr_S1_C1_2,     rightWheel,    tmotorTetrix, openLoop)
+#pragma config(Sensor, S1,     ,               sensorI2CMuxController)
+#pragma config(Sensor, S2,     _gyro,          sensorI2CHiTechnicGyro)
+#pragma config(Sensor, S3,     _SMUX,          sensorI2CCustom)
+#pragma config(Sensor, S4,     light,          sensorLightInactive)
+#pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop, encoder)
+#pragma config(Motor,  mtr_S1_C1_2,     rightWheel,    tmotorTetrix, openLoop, encoder)
 #pragma config(Motor,  mtr_S1_C3_1,     intake,        tmotorTetrix, openLoop, reversed)
-#pragma config(Motor,  mtr_S1_C3_2,     lift,          tmotorTetrix, openLoop, reversed)
+#pragma config(Motor,  mtr_S1_C3_2,     lift,          tmotorTetrix, openLoop, reversed, encoder)
 #pragma config(Servo,  srvo_S1_C2_1,    dragger,              tServoStandard)
 #pragma config(Servo,  srvo_S1_C2_2,    scorer,               tServoStandard)
 #pragma config(Servo,  srvo_S1_C2_3,    servo3,               tServoNone)
@@ -24,7 +25,7 @@ long waitDuration = 0;
 long intercept = 0;
 
 int RG1 = 0;
-int RG2 = 2;
+int RG2 = 0;
 
 bool CG = true;
 bool fill1;
@@ -35,6 +36,18 @@ bool KS = true;
 long KSwait = 0;
 
 int centerRotation; //1 = kickstand facing alliance PZ, 2 = 45, 3 = 90
+
+task liftTask(){
+	busy = true;
+	moveEncSingle(lift, target_power, target_distance, 1);
+	busy = false;
+}
+
+void moveLift(int power, long distance){
+	target_power = power;
+	target_distance = distance;
+	startTask(liftTask);
+}
 
 bool HTSMUXVerifyType(tSensors link){
     memset(HTSMUX_I2CRequest, 0, sizeof(tByteArray));
@@ -77,7 +90,6 @@ task debug(){
 
 task main()
 {
-	configLine("Select Options: ");
 	configLine("Intercept: ", &intercept, "ms", 0, 100, 7500);
 	configLine("Wait: ", &waitDuration, "ms", 0, 100, 10000);
 	configLine("RG1: ", &RG1, "cm", 0, 30, 90);
@@ -94,22 +106,30 @@ task main()
 	stopTask(displayDiagnostics);
 	wait1Msec(1);
 	eraseDisplay();
+	wait1Msec(1000);
 	calibrateGyro(&gyro, 100);
 	startTask(gyroGetHeading);
 	startTask(debug);
-	waitForStart();
+	//waitForStart();
 	stopTask(readMsgFromPC);
 	wait1Msec(waitDuration);
 	if(intercept){
 		move(100, intercept, fwd);
 		return;
 	}
+	heading = 0.0;
 	selectStrategy();
 }
 
 void selectStrategy(){
 	if(ramp){
 	}else{
-
+		if(CG){
+			moveEnc(35, 1000, 15, fwd);
+			turn_gyro(60, -90.0, 0.5);
+			readIR();
+			/*moveEnc(35, 1000, 10, fwd);
+			readIR();*/
+		}
 	}
 }

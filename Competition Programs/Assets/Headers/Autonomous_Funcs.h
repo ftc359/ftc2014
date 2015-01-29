@@ -50,7 +50,7 @@ struct nxtDisplayLineData{
 
 struct nxtDisplayLineData nxtDisplayLines[MAX_LINES];
 
-int iLine;
+int iLine = 0;
 
 //Function prototypes
 void move(int power, long time, tDirection dir);
@@ -65,7 +65,7 @@ void fwd_PID(int power, long time, float minor_error_margin, float major_error_m
 void fwdEnc_PID(int power, long distance, float minor_error_margin, float major_error_margin, int correction);
 void bwd_PID(int power, long time);
 void bwdEnc_PID(int power, long distance);
-void turn_gyro(int power, float angle, float minor_error_margin);
+void turn_gyro(int power, int slow_power, float angle, float minor_error_margin);
 void calibrateGyro(tHTGYROPtr ptr, long trials);
 task gyroGetHeading();
 #endif
@@ -152,7 +152,7 @@ void moveEnc(int power, long distance, int correction, tDirection dir){
     }
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
-    wait1Msec(100);
+    /*wait1Msec(100);
     error = (nPrev[0] + nPrev[1])/2;
     for(int i = 0; i < 2; i++) nPrev[i] = 0;
     motor[DRIVEL] = abs(correction - LEFT_OFFSET)*((dir & 1)?-1:1)*sgn(power)*-sgn(error);
@@ -162,7 +162,7 @@ void moveEnc(int power, long distance, int correction, tDirection dir){
         nPrev[1] = (abs(nMotorEncoder[DRIVER]) - (error + distance) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]) - (error + distance);
     }
     motor[DRIVEL] = 0;
-    motor[DRIVER] = 0;
+    motor[DRIVER] = 0;*/
 #endif
 	wait1Msec(100);
 }
@@ -177,11 +177,16 @@ void moveEncSingle(tMotor mtr, int power, long distance, int correction){
 		nPrev = (abs(nMotorEncoder[mtr]) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[mtr]);
 	motor[mtr] = 0;
 	wait1Msec(100);
+	nxtDisplayTextLine(3, "%d", nPrev);
 	error = nPrev-distance;
+	nxtDisplayTextLine(0, "%d", error);
 	nPrev = 0;
 	motor[mtr] = abs(correction) * sgn(power) * -sgn(error);
-	while(nPrev < abs(error))
+	nxtDisplayTextLine(1, "%d", motor[mtr]);
+	while(nPrev < abs(error)){
 		nPrev = (abs(nMotorEncoder[mtr]) - (error + distance) >= nPrev + ENC_ERRORMARGIN)?nPrev:abs(nMotorEncoder[mtr]) - (error + distance);
+		nxtDisplayTextLine(4, "%d", nPrev);
+	}
 	motor[mtr] = 0;
 	wait1Msec(100);
 }
@@ -354,12 +359,12 @@ void bwdEnc_PID(int power, long distance, float minor_error_margin, float major_
 	bMotorReflected[DRIVER] = !bMotorReflected[DRIVER];
 }
 
-void turn_gyro(int power, float angle, float minor_error_margin){
+void turn_gyro(int power, int slow_power, float angle, float minor_error_margin){
 	float prefHeading = 0.0;
-	prefHeading = heading + angle;
+	prefHeading = heading - angle;
 	while(!(heading <= prefHeading + minor_error_margin && heading >= prefHeading - minor_error_margin)){
-		motor[DRIVEL] = (power - LEFT_OFFSET) * sgn(prefHeading - heading);
-		motor[DRIVER] = (power - RIGHT_OFFSET) *sgn(prefHeading - heading) * -1;
+		motor[DRIVEL] = accelerate(power - LEFT_OFFSET, slow_power - LEFT_OFFSET, 0.0, abs(prefHheading - heading)) * sgn(prefHeading - heading) * -1;
+		motor[DRIVER] = (accelerate(power - RIGHT_OFFSET, slow_power - RIGHT_OFFSET, 0.0, abs(prefHheading - heading)) *sgn(prefHeading - heading);
 	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;
@@ -417,11 +422,11 @@ void configLine(char* desc, char *ptr, char* units, ubyte arraySize){
     nxtDisplayLines[iLine++].config = CONFIG_CHAR;
     nxtDisplayLines[iLine].desc = desc;
     nxtDisplayLines[iLine].units = units;
-    nxtDisplayLines[iLine++].ptr = (void*)(char*)ptr;
+    nxtDisplayLines[iLine].ptr = (void*)(char*)ptr;
     nxtDisplayLines[iLine++].arraySize = arraySize;
 }*/
 void startDisplay(bool onPress, bool savePrefs, char* configFileName){
-    int iNumLines = iLine;
+    int iNumLines = iLine - 1;
     int iCurrentLine = 0;
     int iOffset = 0;
     ubyte iArrayIndex[MAX_LINES];
@@ -507,7 +512,7 @@ void startDisplay(bool onPress, bool savePrefs, char* configFileName){
         Close(hFileHandle, nIoResult);
     }
 
-    for(int index = 0; index < ((iNumLines < 8)?iNumLines:8); index++){
+    for(int index = 0; index < ((iNumLines > 7)?iNumLines:8); index++){
         switch(nxtDisplayLines[index].config){
             case CONFIG_UNSET:
                 break;
@@ -893,7 +898,7 @@ void startDisplay(bool onPress, bool savePrefs, char* configFileName){
 					    if(savePrefs){
 				    		Delete(configFileName, nIoResult);
 				    		nFileSize = 0;
-				    		for(int index = 0; index <= iNumLines; index++){
+				    		for(int index = 0; index < ((iNumLines < 8)?iNumLines:8); index++){
 				        	switch(nxtDisplayLines[index].config) {
 				     	     case CONFIG_UNSET:
 				   		       break;
@@ -917,7 +922,7 @@ void startDisplay(bool onPress, bool savePrefs, char* configFileName){
 					      }
 				        OpenWrite(hFileHandle, nIoResult, configFileName, nFileSize);
 				        if(nIoResult == ioRsltSuccess){
-					        for(int index = 0; index <= iNumLines; index++){
+					        for(int index = 0; index < ((iNumLines < 8)?iNumLines:8); index++){
 					        	switch(nxtDisplayLines[index].config) {
 					     	     case CONFIG_UNSET:
 					   		       break;
