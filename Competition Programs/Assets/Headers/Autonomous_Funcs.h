@@ -363,8 +363,22 @@ void turn_gyro(int power, int slow_power, float angle, float minor_error_margin)
 	float prefHeading = 0.0;
 	prefHeading = heading - angle;
 	while(!(heading <= prefHeading + minor_error_margin && heading >= prefHeading - minor_error_margin)){
-		motor[DRIVEL] = accelerate(power - LEFT_OFFSET, slow_power - LEFT_OFFSET, 0.0, abs(prefHheading - heading)) * sgn(prefHeading - heading) * -1;
-		motor[DRIVER] = (accelerate(power - RIGHT_OFFSET, slow_power - RIGHT_OFFSET, 0.0, abs(prefHheading - heading)) *sgn(prefHeading - heading);
+		motor[DRIVEL] = ((abs(prefHeading - heading) < 10.0)?(slow_power-LEFT_OFFSET):(power-LEFT_OFFSET)) * sgn(prefHeading - heading) * -1;
+		motor[DRIVER] = ((abs(prefHeading - heading) < 10.0)?(slow_power-RIGHT_OFFSET):(power-RIGHT_OFFSET)) *sgn(prefHeading - heading);
+	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+	while(!(heading <= prefHeading + minor_error_margin && heading >= prefHeading - minor_error_margin)){
+		motor[DRIVEL] = ((abs(prefHeading - heading) < 10.0)?(slow_power-LEFT_OFFSET):(power-LEFT_OFFSET)) * sgn(prefHeading - heading) * -1;
+		motor[DRIVER] = ((abs(prefHeading - heading) < 10.0)?(slow_power-RIGHT_OFFSET):(power-RIGHT_OFFSET)) *sgn(prefHeading - heading);
+	}
+	motor[DRIVEL] = 0;
+	motor[DRIVER] = 0;
+	wait1Msec(100);
+	while(!(heading <= prefHeading + minor_error_margin && heading >= prefHeading - minor_error_margin)){
+		motor[DRIVEL] = ((abs(prefHeading - heading) < 10.0)?(slow_power-LEFT_OFFSET):(power-LEFT_OFFSET)) * sgn(prefHeading - heading) * -1;
+		motor[DRIVER] = ((abs(prefHeading - heading) < 10.0)?(slow_power-RIGHT_OFFSET):(power-RIGHT_OFFSET)) *sgn(prefHeading - heading);
 	}
 	motor[DRIVEL] = 0;
 	motor[DRIVER] = 0;

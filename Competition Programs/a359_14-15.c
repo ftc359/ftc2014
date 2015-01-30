@@ -1,15 +1,14 @@
 #pragma config(Hubs,  S1, HTMotor,  HTServo,  HTMotor,  none)
-#pragma config(Sensor, S1,     ,               sensorI2CMuxController)
-#pragma config(Sensor, S2,     _gyro,          sensorI2CHiTechnicGyro)
-#pragma config(Sensor, S3,     _SMUX,          sensorI2CCustom)
-#pragma config(Sensor, S4,     light,          sensorLightInactive)
+#pragma config(Sensor, S2,     _ir_front,      sensorI2CCustom)
+#pragma config(Sensor, S3,     _gyro,          sensorI2CHiTechnicGyro)
+#pragma config(Sensor, S4,     _ir_back,       sensorI2CCustom)
 #pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop, encoder)
 #pragma config(Motor,  mtr_S1_C1_2,     rightWheel,    tmotorTetrix, openLoop, encoder)
 #pragma config(Motor,  mtr_S1_C3_1,     intake,        tmotorTetrix, openLoop, reversed)
 #pragma config(Motor,  mtr_S1_C3_2,     lift,          tmotorTetrix, openLoop, reversed, encoder)
 #pragma config(Servo,  srvo_S1_C2_1,    dragger,              tServoStandard)
 #pragma config(Servo,  srvo_S1_C2_2,    scorer,               tServoStandard)
-#pragma config(Servo,  srvo_S1_C2_3,    servo3,               tServoNone)
+#pragma config(Servo,  srvo_S1_C2_3,    front_dragger,        tServoStandard)
 #pragma config(Servo,  srvo_S1_C2_4,    servo4,               tServoNone)
 #pragma config(Servo,  srvo_S1_C2_5,    servo5,               tServoNone)
 #pragma config(Servo,  srvo_S1_C2_6,    servo6,               tServoNone)
@@ -72,14 +71,14 @@ void selectStrategy();
 
 task debug(){
 	bool ruhroh = false;
-	if (HTSMUXVerifyType(_SMUX) == false){
+	/*if (HTSMUXVerifyType(_SMUX) == false){
 		nxtDisplayTextLine(0, "SMUX not connected");
 		ruhroh = true;
 	}
 	if(HTSMUXreadPowerStatus(_SMUX)){
 		nxtDisplayTextLine(1, "SMUX low batt");
 		ruhroh = true;
-	}
+	}*/
 	if(ruhroh)
 		playSound(soundBeepBeep);
 	while(true){
@@ -98,14 +97,16 @@ task main()
 	configLine("", &CG, "", "CG", "RG");
 	configLine("KS: ", &KS, "", "Yes", "No");
 	configLine("KS wait: ", &KSwait, "", 0, 100, 5000);
-	startDisplay(true, true, "a359.txt");
+	//startDisplay(true, true, "a359.txt");
 	initializeRobot();
 	servo[dragger] = DRAGGER_UP;
+	servo[front_dragger] = FRONT_DRAGGER_UP;
 	servo[scorer] = SCORER_CLOSE;
 	bSystemLeaveServosEnabledOnProgramStop = true;
 	stopTask(displayDiagnostics);
 	wait1Msec(1);
 	eraseDisplay();
+	startTask(debug);
 	wait1Msec(1000);
 	calibrateGyro(&gyro, 100);
 	startTask(gyroGetHeading);
@@ -119,6 +120,7 @@ task main()
 	}
 	heading = 0.0;
 	selectStrategy();
+	while(true){}
 }
 
 void selectStrategy(){
@@ -126,10 +128,48 @@ void selectStrategy(){
 	}else{
 		if(CG){
 			moveEnc(35, 1000, 15, fwd);
-			turn_gyro(60, -90.0, 0.5);
+			turn_gyro(60, 30, -90.0, 2.0);
 			readIR();
-			/*moveEnc(35, 1000, 10, fwd);
-			readIR();*/
+			moveEnc(35, 3000, 10, fwd);
+			readIR();
+			displayTextLine(0, "IRf1: %d", ir_front_dir[0]);
+			displayTextLine(1, "IRf2: %d", ir_front_dir[1]);
+			displayTextLine(2, "IRb1: %d", ir_back_dir[0]);
+			displayTextLine(3, "IRb2: %d", ir_back_dir[1]);
+			if((ir_front_dir[0] == 0 || ir_front_dir[0] == 7) &&
+				(ir_front_dir[1] == 0 || ir_front_dir[1] == 7) &&
+				(ir_back_dir[0] == 0 || (ir_back_dir[0] >= 6 && ir_back_dir[0] <= 7)) &&
+				(ir_back_dir[1] == 0 || (ir_back_dir[1] >= 5 && ir_back_dir[1] <= 7)))
+				centerRotation = 1;
+			nxtDisplayTextLine(4, "CR: %d", centerRotation);
+			switch(centerRotation){
+				case 1:
+					moveLift(30, 10000);
+					turn_gyro(60, 30, 90.0, 2.0);
+					moveEnc(50, 2000, 15, fwd);
+					turn_gyro(60, 30, -90.0, 2.0);
+					moveEnc(50, 1750, 15, fwd);
+					turn_gyro(60, 30, -90.0, 2.0);
+					moveEnc(50, 3750, 15, bwd);
+					turn_gyro(60, 30, 90.0, 2.0);
+					moveEnc(35, 1250, 15, bwd);
+					if(RG1 || RG2)
+						servo[scorer] = SCORER_OPEN_AUTO;
+					else
+						servo[scorer] = SCORER_OPEN_CG;
+					wait1Msec(1000);
+					servo[scorer] = SCORER_CLOSE;
+					moveEnc(35, 2150, 15, fwd);
+					moveLift(-20, 5000);
+					turn_gyro(60, 30, -90.0, 2.0);
+					moveEnc(35, 1000, 15, fwd);
+					turn_gyro(60, 30, -90.0, 2.0);
+					moveEnc(100, 2000, fwd);
+					break;
+				default:
+					playSound(soundBeepBeep);
+					break;
+			}
 		}
 	}
 }
