@@ -1,8 +1,7 @@
 #pragma config(Hubs,  S1, HTMotor,  HTServo,  HTMotor,  none)
-#pragma config(Sensor, S1,     ,               sensorI2CMuxController)
-#pragma config(Sensor, S2,     _gyro,          sensorI2CHiTechnicGyro)
-#pragma config(Sensor, S3,     _SMUX,          sensorI2CCustom)
-#pragma config(Sensor, S4,     light,          sensorLightInactive)
+#pragma config(Sensor, S2,     _ir_front,      sensorI2CCustom)
+#pragma config(Sensor, S3,     _gyro,          sensorI2CHiTechnicGyro)
+#pragma config(Sensor, S4,     _ir_back,       sensorI2CCustom)
 #pragma config(Motor,  mtr_S1_C1_1,     leftWheel,     tmotorTetrix, openLoop, encoder)
 #pragma config(Motor,  mtr_S1_C1_2,     rightWheel,    tmotorTetrix, openLoop, encoder)
 #pragma config(Motor,  mtr_S1_C3_1,     intake,        tmotorTetrix, openLoop, reversed)
@@ -28,10 +27,10 @@ task main()
 	while(true){
 		getJoystickSettings(joystick);
 		if(abs(joystick.joy1_y1) >= THRESHOLD)
-			motor[leftWheel] = joystickExponential(THRESHOLD, maxDrive-RIGHT_OFFSET, joystick.joy1_y1);
+			motor[leftWheel] = joystickExponential(THRESHOLD, maxDrive-LEFT_OFFSET, joystick.joy1_y1);
 		else motor[leftWheel] = 0;
 		if(abs(joystick.joy1_y2) >= THRESHOLD)
-			motor[rightWheel] = joystickExponential(THRESHOLD, maxDrive-LEFT_OFFSET, joystick.joy1_y2);
+			motor[rightWheel] = joystickExponential(THRESHOLD, maxDrive-RIGHT_OFFSET, joystick.joy1_y2);
 		else motor[rightWheel] = 0;
 		if(abs(joystick.joy2_y1) >= THRESHOLD)
 			motor[intake] = joystickExponential(THRESHOLD, 100, joystick.joy2_y1);
@@ -44,6 +43,10 @@ task main()
 			servo[dragger] = DRAGGER_UP;
 		if(toggleJ1B(6, true))
 			servo[dragger] = DRAGGER_DOWN;
+		if(toggleJ1B(7, true))
+			servo[front_dragger] = FRONT_DRAGGER_UP;
+		if(toggleJ1B(8, true))
+			servo[front_dragger] = FRONT_DRAGGER_DOWN;
 		if(toggleJ2B(2, true))
 			servo[scorer] = SCORER_CLOSE;
 		if(toggleJ2B(3, true))

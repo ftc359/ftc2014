@@ -23,14 +23,14 @@
 long waitDuration = 0;
 long intercept = 0;
 
-int RG1 = 0;
-int RG2 = 0;
+int RG1 = 60;
+int RG2 = 90;
 
-bool CG = true;
+bool CG = false;
 bool fill1;
-bool ramp = false;
+bool ramp = true;
 bool fill2;
-bool KS = true;
+bool KS = false;
 
 long KSwait = 0;
 
@@ -38,7 +38,7 @@ int centerRotation; //1 = kickstand facing alliance PZ, 2 = 45, 3 = 90
 
 task liftTask(){
 	busy = true;
-	moveEncSingle(lift, target_power, target_distance, 1);
+	moveEncSingle(lift, target_power, target_distance, 10);
 	busy = false;
 }
 
@@ -82,17 +82,28 @@ task debug(){
 	if(ruhroh)
 		playSound(soundBeepBeep);
 	while(true){
-		nxtDisplayTextLine(7, "H: %3.1f", heading);
-		nxtDisplayTextLine(6, "D: %3.1f", deadband);
+		nxtDisplayTextLine(1, "H: %3.1f", heading);
+		nxtDisplayTextLine(0, "D: %3.1f", deadband);
 	}
+}
+
+task timer(){
+	wait1Msec(20000);
+	playSound(soundBeepBeep);
+	wait1Msec(10);
+	playSound(soundBeepBeep);
+	wait1Msec(9990);
+	playSound(soundBeepBeep);
+	wait1Msec(1000);
+	stopAllTasks();
 }
 
 task main()
 {
 	configLine("Intercept: ", &intercept, "ms", 0, 100, 7500);
 	configLine("Wait: ", &waitDuration, "ms", 0, 100, 10000);
-	configLine("RG1: ", &RG1, "cm", 0, 30, 90);
-	configLine("RG2: ", &RG2, "cm", 0, 30, 90);
+	configLine("RG1: ", &RG1, "cm", 0, 20, 90);
+	configLine("RG2: ", &RG2, "cm", 0, 20, 90);
 	configLine("", &ramp, "", "Ramp", "PZ");
 	configLine("", &CG, "", "CG", "RG");
 	configLine("KS: ", &KS, "", "Yes", "No");
@@ -108,10 +119,11 @@ task main()
 	eraseDisplay();
 	startTask(debug);
 	wait1Msec(1000);
-	calibrateGyro(&gyro, 100);
+	calibrateGyro(&gyro, 100, gyro_bwd);
 	startTask(gyroGetHeading);
 	startTask(debug);
 	//waitForStart();
+	startTask(timer);
 	stopTask(readMsgFromPC);
 	wait1Msec(waitDuration);
 	if(intercept){
@@ -125,46 +137,87 @@ task main()
 
 void selectStrategy(){
 	if(ramp){
+		if(CG){
+		}else{
+			moveEnc(90, 5500, 30, bwd);
+			move(20, 1000, fwd);
+			turn_gyro(30, 20, -heading, 0.5, 1500);
+			moveEnc(90, 3000, 30, bwd);
+			if(RG1 == 60 && RG2 == 90){
+				moveEnc(50, 750, 30, bwd);
+				moveLift(100, 4250);
+				servo[dragger] = DRAGGER_DOWN;
+				wait1Msec(500);
+				while(busy){}
+				servo[scorer] = SCORER_OPEN_AUTO;
+				wait1Msec(500);
+				servo[scorer] = SCORER_CLOSE;
+				moveEnc(90, 1000, 30, fwd);
+				turn_gyro(90, 25, 90.0 - heading, 0.5, 3000);
+				moveEnc(50, 1000, 30, bwd);
+				servo[dragger] = DRAGGER_UP;
+				wait1Msec(250);
+				moveEnc(50, 500, 30, fwd);
+				moveLift(100, 2500);
+				turn_gyro(30, 20, -heading, 0.5, 3000);
+				move(90, 1500, bwd);
+				servo[dragger] = DRAGGER_DOWN;
+				servo[scorer] = SCORER_OPEN_RG;
+				wait1Msec(1000);
+				servo[scorer] = SCORER_CLOSE;
+				moveLift(-20, 5000);
+				moveEnc(90, 1000, 25, fwd);
+				turn_gyro(30, 20, -27.5 - heading, 0.5, 2000);
+				moveEnc(90, 1750, 25, fwd);
+				servo[front_dragger] = FRONT_DRAGGER_DOWN;
+				wait1Msec(1000);
+				moveEnc(90, 10000, 25, fwd);
+				servo[front_dragger] = FRONT_DRAGGER_UP;
+				wait1Msec(250);
+				turn_gyro(90, 25, -135.0, 0.5, 2000);
+			}
+		}
 	}else{
 		if(CG){
-			moveEnc(35, 1000, 15, fwd);
-			turn_gyro(60, 30, -90.0, 2.0);
+			moveEnc(35, 1000, 20, fwd);
+			turn_gyro(60, 20, -90.0, 0.5, 2000);
 			readIR();
-			moveEnc(35, 3000, 10, fwd);
+			moveEnc(35, 3000, 20, fwd);
 			readIR();
 			displayTextLine(0, "IRf1: %d", ir_front_dir[0]);
 			displayTextLine(1, "IRf2: %d", ir_front_dir[1]);
 			displayTextLine(2, "IRb1: %d", ir_back_dir[0]);
 			displayTextLine(3, "IRb2: %d", ir_back_dir[1]);
-			if((ir_front_dir[0] == 0 || ir_front_dir[0] == 7) &&
-				(ir_front_dir[1] == 0 || ir_front_dir[1] == 7) &&
-				(ir_back_dir[0] == 0 || (ir_back_dir[0] >= 6 && ir_back_dir[0] <= 7)) &&
-				(ir_back_dir[1] == 0 || (ir_back_dir[1] >= 5 && ir_back_dir[1] <= 7)))
+			if((ir_front_dir[0] == 0 || (ir_front_dir[0] >= 6 && ir_front_dir[0] <= 7)) &&
+				(ir_front_dir[1] == 0 || (ir_front_dir[1] >= 5 && ir_front_dir[1] <= 7) || ir_front_dir[1] == 4) &&
+				(ir_back_dir[0] == 0 || ir_back_dir[0] == 3 || (ir_back_dir[0] >= 6 && ir_back_dir[0] <= 7)) &&
+				(ir_back_dir[1] == 0 || ir_back_dir[1] == 3 || (ir_back_dir[1] >= 5 && ir_back_dir[1] <= 7)))
 				centerRotation = 1;
 			nxtDisplayTextLine(4, "CR: %d", centerRotation);
 			switch(centerRotation){
 				case 1:
-					moveLift(30, 10000);
-					turn_gyro(60, 30, 90.0, 2.0);
-					moveEnc(50, 2000, 15, fwd);
-					turn_gyro(60, 30, -90.0, 2.0);
-					moveEnc(50, 1750, 15, fwd);
-					turn_gyro(60, 30, -90.0, 2.0);
-					moveEnc(50, 3750, 15, bwd);
-					turn_gyro(60, 30, 90.0, 2.0);
-					moveEnc(35, 1250, 15, bwd);
-					if(RG1 || RG2)
+					turn_gyro(60, 20,  75.0, 0.5, 3000);
+					moveEnc(90, 5500, 30, fwd);
+					/*moveEnc(90, 2000, 20, fwd);
+					moveLift(60, 9750);
+					turn_gyro(60, 20, -90.0, 0.5);
+					moveEnc(90, 1750, 20, fwd);
+					turn_gyro(60, 20, -90.0, 0.5);
+					moveEnc(90, 3650, 20, bwd);
+					turn_gyro(60, 20, 90.0, 0.5);
+					moveEnc(35, 2000, 20, bwd);*/
+					/*if(RG1 || RG2)
 						servo[scorer] = SCORER_OPEN_AUTO;
 					else
 						servo[scorer] = SCORER_OPEN_CG;
-					wait1Msec(1000);
+					wait1Msec(2000);
 					servo[scorer] = SCORER_CLOSE;
-					moveEnc(35, 2150, 15, fwd);
-					moveLift(-20, 5000);
-					turn_gyro(60, 30, -90.0, 2.0);
-					moveEnc(35, 1000, 15, fwd);
-					turn_gyro(60, 30, -90.0, 2.0);
-					moveEnc(100, 2000, fwd);
+					moveEnc(90, 1000, 20, fwd);
+					moveLift(-20, 9000);
+					turn_gyro(60, 20, -90.0, 0.5);
+					moveEnc(90, 1000, 20, fwd);
+					turn_gyro(60, 20, -90.0, 0.5);
+					moveEnc(90, 6000, 20, fwd);*/
 					break;
 				default:
 					playSound(soundBeepBeep);

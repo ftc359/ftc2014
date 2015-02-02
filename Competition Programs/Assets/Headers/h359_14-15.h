@@ -26,6 +26,8 @@ void readIR();
 #define DRIVER				rightWheel
 #define DRIVEL				leftWheel
 #define THRESHOLD			10
+#define LEFT_OFFSET 	-10
+#define RIGHT_OFFSET 	5
 
 const ubyte DRAGGER_UP = 180;
 const ubyte DRAGGER_DOWN = 150;
@@ -35,7 +37,7 @@ const ubyte FRONT_DRAGGER_DOWN = 255;
 
 const ubyte SCORER_OPEN_CG = 180;
 const ubyte SCORER_OPEN_RG = 65;
-const ubyte SCORER_OPEN_AUTO = 225;
+const ubyte SCORER_OPEN_AUTO = 220;
 const ubyte SCORER_CLOSE = 255;
 
 void initializeRobot(){
