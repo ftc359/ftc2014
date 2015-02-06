@@ -94,7 +94,6 @@ task timer(){
 	playSound(soundBeepBeep);
 	wait1Msec(9990);
 	playSound(soundBeepBeep);
-	wait1Msec(1000);
 	stopAllTasks();
 }
 
@@ -108,15 +107,15 @@ task main()
 	configLine("", &CG, "", "CG", "RG");
 	configLine("KS: ", &KS, "", "Yes", "No");
 	configLine("KS wait: ", &KSwait, "", 0, 100, 5000);
-	startDisplay(true, true, "a359.txt");
+	//startDisplay(true, true, "a359.txt");
 	initializeRobot();
 	servo[dragger] = DRAGGER_UP;
 	servo[front_dragger] = FRONT_DRAGGER_UP;
-	servo[scorer] = SCORER_CLOSE;
+	servo[scorer] = 255;
 	bSystemLeaveServosEnabledOnProgramStop = true;
 	stopTask(displayDiagnostics);
 	wait1Msec(1);
-	eraseDisplay();;
+	eraseDisplay();
 	wait1Msec(999);
 	calibrateGyro(&gyro, 100, gyro_bwd);
 	startTask(gyroGetHeading);
@@ -138,38 +137,42 @@ void selectStrategy(){
 	if(ramp){
 		if(CG){
 		}else{
-			moveEnc(90, 5500, 30, bwd);
-			move(20, 1000, fwd);
+			moveEnc(90, 5250, 30, bwd);
+			move(20, 1500, fwd);
 			heading = 0.0;
-			moveEnc(90, 3000, 30, bwd);
-			if(RG1 == 60 && RG2 == 90){
-				moveEnc(50, 750, 30, bwd);
-				moveLift(100, 4100);
+			moveLift(100, 4100);
+			moveEnc(90, 4000, 30, bwd);
+			if(true /*RG1 == 60 && RG2 == 90*/){
 				servo[dragger] = DRAGGER_DOWN;
 				wait1Msec(500);
 				while(busy){}
 				servo[scorer] = SCORER_OPEN_AUTO;
 				wait1Msec(500);
 				servo[scorer] = SCORER_CLOSE;
-				moveEnc(90, 1000, 30, fwd);
-				turn_gyro(90, 25, 90.0 - heading, 0.5, 2500);
-				moveEnc(50, 1000, 30, bwd);
+				moveEnc(90, 1250, 30, fwd);
+				turn_gyro(60, 25, 90.0 - heading, 1.0, 2500);
+				move(30, 600, fwd);
+				wait1Msec(100);
+				heading = 90.0;
+				moveEnc(50, 850, 30, bwd);
 				servo[dragger] = DRAGGER_UP;
 				wait1Msec(250);
-				moveEnc(50, 500, 30, fwd);
-				turn_gyro(30, 20, -heading, 0.5, 3000);
-				move(90, 1500, bwd);
+				moveEnc(50, 350, 30, fwd);
+				turn_gyro(30, 15, -heading, 1.0, 3000);
+				moveEnc(90, 4250, 25, bwd);
 				servo[dragger] = DRAGGER_DOWN;
 				moveEnc(90, 1000, 25, fwd);
-				turn_gyro(30, 20, -27.5 - heading, 0.5, 2000);
-				moveEnc(90, 1750, 25, fwd);
+				turn_gyro(30, 15, -25.0 - heading, 0.5, 2000);
+				moveEnc(60, 1250, 25, fwd);
 				servo[front_dragger] = FRONT_DRAGGER_DOWN;
 				wait1Msec(1000);
-				moveEnc(90, 10000, 25, fwd);
+				moveEnc(90, 9000, 25, fwd);
 				servo[front_dragger] = FRONT_DRAGGER_UP;
-				moveLift(100, 2650);
+				moveLift(100, 3000);
 				wait1Msec(250);
-				turn_gyro(90, 25, -135.0, 0.5, 2000);
+				turn_gyro(90, 25, 160.0, 2.0, 2000);
+				moveEnc(60, 500, 25, bwd);
+				wait1Msec(500);
 				servo[scorer] = SCORER_OPEN_RG;
 				wait1Msec(2000);
 				servo[scorer] = SCORER_CLOSE;

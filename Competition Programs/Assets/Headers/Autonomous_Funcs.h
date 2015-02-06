@@ -149,25 +149,7 @@ void moveEnc(int power, long distance, int correction, tDirection dir){
     nMotorEncoder[DRIVEL] = 0;
     nMotorEncoder[DRIVER] = 0;
     wait1Msec(300); //wait for the encoders to calibrate
-    while(!(nPrev[0] <= distance + 50 && nPrev[0] >= distance - 50) && !(nPrev[1] <= distance + 50 && nPrev[1] >= distance - 50)){
-    	error = distance - (nPrev[0] + nPrev[1])/2;
-   		motor[DRIVEL] = (((abs(error) <= 250)?correction:power) - LEFT_OFFSET)*((dir & 1)?-1:1) * sgn(error);
- 		  motor[DRIVER] = (((abs(error) <= 250)?correction:power) - RIGHT_OFFSET)*((dir & 2)?-1:1) * sgn(error);
-     	nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
- 	   	nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]);
-    }
-    motor[DRIVEL] = 0;
-    motor[DRIVER] = 0;
-    while(!(nPrev[0] <= distance + 50 && nPrev[0] >= distance - 50) && !(nPrev[1] <= distance + 50 && nPrev[1] >= distance - 50)){
-    	error = distance - (nPrev[0] + nPrev[1])/2;
-   		motor[DRIVEL] = (((abs(error) <= 250)?correction:power) - LEFT_OFFSET)*((dir & 1)?-1:1) * sgn(error);
- 		  motor[DRIVER] = (((abs(error) <= 250)?correction:power) - RIGHT_OFFSET)*((dir & 2)?-1:1) * sgn(error);
-     	nPrev[0] = (abs(nMotorEncoder[DRIVEL]) >= nPrev[0] +  ENC_ERRORMARGIN)?nPrev[0]:abs(nMotorEncoder[DRIVEL]);
- 	   	nPrev[1] = (abs(nMotorEncoder[DRIVER]) >= nPrev[1] +  ENC_ERRORMARGIN)?nPrev[1]:abs(nMotorEncoder[DRIVER]);
-    }
-    motor[DRIVEL] = 0;
-    motor[DRIVER] = 0;
-    while(!(nPrev[0] <= distance + 50 && nPrev[0] >= distance - 50) && !(nPrev[1] <= distance + 50 && nPrev[1] >= distance - 50)){
+    while(nPrev[0] <= distance && nPrev[1] <= distance){
     	error = distance - (nPrev[0] + nPrev[1])/2;
    		motor[DRIVEL] = (((abs(error) <= 250)?correction:power) - LEFT_OFFSET)*((dir & 1)?-1:1) * sgn(error);
  		  motor[DRIVER] = (((abs(error) <= 250)?correction:power) - RIGHT_OFFSET)*((dir & 2)?-1:1) * sgn(error);
@@ -177,9 +159,6 @@ void moveEnc(int power, long distance, int correction, tDirection dir){
     motor[DRIVEL] = 0;
     motor[DRIVER] = 0;
 #endif
-	nxtDisplayTextLine(5, "%d", nPrev[0]);
-	nxtDisplayTextLine(6, "%d", nPrev[1]);
-	nxtDisplayTextLine(7, "%d", (nPrev[0] + nPrev[1])/2);
 }
 void moveEncSingle(tMotor mtr, int power, long distance, int correction){
 	long nPrev = 0;

@@ -33,7 +33,7 @@ const ubyte DRAGGER_UP = 180;
 const ubyte DRAGGER_DOWN = 150;
 
 const ubyte FRONT_DRAGGER_UP = 0;
-const ubyte FRONT_DRAGGER_DOWN = 255;
+const ubyte FRONT_DRAGGER_DOWN = 245;
 
 const ubyte SCORER_OPEN_CG = 180;
 const ubyte SCORER_OPEN_RG = 65;
