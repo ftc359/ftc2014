@@ -1,4 +1,5 @@
 #Gaulbots2 #359 Cascade Effect
+![alt text](https://goo.gl/Jf7P4a)
 Our source code utilized during the 2014-2015 season of Cascade Effect.
 ##[Competition Programs](https://github.com/ftc359/ftc2014/tree/master/Competition%20Programs)
 These are the programs that we run during TeleOp and Autonomous.
